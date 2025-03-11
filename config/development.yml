@@ -1,0 +1,20 @@
+# Development environment configuration
+scraper:
+  url: "https://www.timeshighereducation.com/world-university-rankings/latest/world-ranking#!/length/-1/sort_by/rank/sort_order/asc/cols/scores"
+  request_delay: 1  # Shorter delay for development
+
+processor:
+  missing_values_strategy: "zero"
+
+# Development database configuration (uses local PostgreSQL)
+database:
+  enabled: true
+  exporter_type: "postgres"
+  host: "localhost"
+  port: 5432
+  database: "university_rankings_dev"
+  user: "postgres"
+  password: "postgres"
+  schema: "public"
+  table_name: "university_rankings"
+  if_exists: "replace"

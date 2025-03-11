@@ -1,0 +1,23 @@
+# Production environment configuration
+scraper:
+  url: "https://www.timeshighereducation.com/world-university-rankings/latest/world-ranking#!/length/-1/sort_by/rank/sort_order/asc/cols/scores"
+  request_delay: 5  # Longer delay to avoid rate limiting
+  max_retries: 5
+
+processor:
+  missing_values_strategy: "median"  # More robust for production
+
+# Production database configuration
+database:
+  enabled: true
+  exporter_type: "postgres"
+  host: "${DB_HOST}"          # Use environment variables for sensitive information
+  port: "${DB_PORT}"
+  database: "${DB_NAME}"
+  user: "${DB_USER}"
+  password: "${DB_PASSWORD}"
+  schema: "public"
+  table_name: "university_rankings"
+  if_exists: "append"         # Append to existing data in production
+  create_schema: false        # Don't create schema in production (managed separately)
+  manage_schema: false        # Don't manage schema in production (managed separately)

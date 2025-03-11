@@ -1,0 +1,38 @@
+# Default configuration for University Rankings Scraper
+
+# Scraper configuration
+scraper:
+  url: "https://www.timeshighereducation.com/world-university-rankings/latest/world-ranking#!/length/-1/sort_by/rank/sort_order/asc/cols/scores"
+  request_delay: 3  # Seconds between requests
+  max_retries: 3
+  timeout: 30  # Request timeout in seconds
+
+# Parser configuration
+parser:
+  use_lxml: true  # Use lxml for faster parsing
+
+# Processor configuration
+processor:
+  missing_values_strategy: "zero"  # Options: zero, mean, median
+
+# Database configuration
+database:
+  enabled: true
+  exporter_type: "postgres"
+  host: "localhost"
+  port: 5432
+  database: "university_rankings"
+  user: "postgres"
+  password: "postgres"
+  schema: "public"
+  table_name: "university_rankings"
+  if_exists: "replace"  # Options: fail, replace, append
+  create_schema: true   # Create table if it doesn't exist
+  manage_schema: true   # Manage table schema based on DataFrame structure
+  chunk_size: 1000      # Number of records to insert at once
+
+# Storage configuration
+storage:
+  base_path: "data"
+  save_raw_data: true
+  save_processed_data: true
