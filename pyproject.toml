@@ -12,6 +12,7 @@ black = "^25.1.0"
 requests = "^2.32.3"
 pandas = "^2.2.3"
 beautifulsoup4 = "^4.13.3"
+sqlalchemy = "^2.0.38"
 
 
 [build-system]
