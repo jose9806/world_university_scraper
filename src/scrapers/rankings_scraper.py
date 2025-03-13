@@ -3,7 +3,7 @@
 import logging
 from typing import Dict, Any
 
-from scrapers.base_scraper import BaseScraper
+from .base_scraper import BaseScraper
 
 logger = logging.getLogger(__name__)
 

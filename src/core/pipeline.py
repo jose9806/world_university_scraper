@@ -1,82 +1,126 @@
-# src/university_rankings/core/pipeline.py
-"""Core pipeline for the scraping process."""
+"""Scraping pipeline for university rankings data."""
 
 import logging
 import os
-from typing import Dict, Any
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Any, List
 
-from scrapers.rankings_scraper import RankingsScraper
-from parsers.rankings_parser import RankingsParser
-from processors.data_processor import DataProcessor
-from exporters.exporter_factory import create_exporter
-from storage.file_storage import FileStorage
-from utils.exceptions import ExporterException
+from .exceptions import ScraperException, ParserException
+from ..scrapers.base_scraper import BaseScraper
+from ..scrapers.selenium_rankings_scraper import SeleniumRankingsScraper
+from ..scrapers.rankings_scraper import RankingsScraper
+from ..parsers.rankings_parser import RankingsParser
 
 logger = logging.getLogger(__name__)
 
 
 class ScrapingPipeline:
-    """Orchestrates the scraping, parsing, processing, and database export process."""
+    """Pipeline to orchestrate scraping, parsing, and data processing."""
 
     def __init__(self, config: Dict[str, Any]):
-        """Initialize the pipeline with configuration.
+        """Initialize the scraping pipeline with configuration.
 
         Args:
-            config: Configuration dictionary
+            config: Dictionary containing configuration settings
         """
         self.config = config
-        self.scraper = RankingsScraper(config["scraper"])
-        self.parser = RankingsParser()
-        self.processor = DataProcessor(config.get("processor", {}))
-        self.storage = FileStorage(config["storage"])
+        self.scraper = self._create_scraper()
+        self.parser = self._create_parser()
 
-        # Initialize database exporter if enabled
-        self.db_exporter = None
-        if config.get("database", {}).get("enabled", False):
-            self._setup_database_exporter()
+        # Create output directories
+        output_dir = self.config.get("general", {}).get("output_dir", "data/raw")
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def _setup_database_exporter(self):
-        """Set up the database exporter based on configuration."""
-        db_config = self.config.get("database", {})
-        exporter_type = db_config.get("exporter_type", "postgres")
+    def _create_scraper(self) -> BaseScraper:
+        """Create and configure the appropriate scraper based on configuration.
 
-        try:
-            logger.info(f"Setting up {exporter_type} exporter")
-            self.db_exporter = create_exporter(exporter_type, self.config)
-        except ExporterException as e:
-            logger.error(f"Failed to initialize database exporter: {e}")
-            self.db_exporter = None
+        Returns:
+            Configured scraper instance
+        """
+        scraper_config = self.config.get("scraper", {})
+        scraper_type = scraper_config.get("type", "basic")
+
+        if scraper_type == "selenium":
+            logger.info("Creating Selenium-based scraper")
+
+            # Combine scraper and selenium configs
+            selenium_config = self.config.get("selenium", {})
+            combined_config = {**scraper_config, **selenium_config}
+
+            return SeleniumRankingsScraper(combined_config)
+        else:
+            logger.info("Creating standard HTTP scraper")
+            return RankingsScraper(scraper_config)
+
+    def _create_parser(self):
+        """Create and configure the appropriate parser based on configuration.
+
+        Returns:
+            Configured parser instance
+        """
+        parser_config = self.config.get("parser", {})
+        parser_type = parser_config.get("type", "rankings")
+
+        if parser_type == "rankings":
+            return RankingsParser()
+        else:
+            # Add other parser types if needed
+            return RankingsParser()
 
     def run(self):
-        """Execute the complete pipeline."""
-        logger.info("Starting scraping pipeline")
+        """Run the complete scraping pipeline."""
+        try:
+            # Get scraping parameters
+            rankings_config = self.config.get("scraper", {}).get("rankings", {})
+            year = rankings_config.get("year", "2025")
+            view = rankings_config.get("view", "reputation")
 
-        # 1. Scrape the data
-        raw_data = self.scraper.scrape()
+            logger.info(f"Starting scraping for year {year}, view {view}")
 
-        # Save raw data if configured
-        if self.config.get("storage", {}).get("save_raw_data", True):
-            self.storage.save_raw_data(raw_data)
+            # For Selenium scraper, use the specific scrape_rankings method
+            if isinstance(self.scraper, SeleniumRankingsScraper):
+                html_content = self.scraper.scrape_rankings(year=year, view=view)
+            else:
+                # For basic scraper, construct URL and call make_request
+                base_url = self.config.get("scraper", {}).get("base_url", "")
+                url = f"{base_url}/{year}/world-ranking/results?view={view}"
+                html_content = self.scraper._make_request(url)
 
-        # 2. Parse the data
-        parsed_data = self.parser.parse(raw_data)
+            # Save raw HTML if configured to do so
+            if self.config.get("selenium", {}).get("save_html", False):
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                html_path = self.output_dir / f"rankings_{year}_{view}_{timestamp}.html"
 
-        # 3. Process the data
-        processed_data = self.processor.process(parsed_data)
+                with open(html_path, "w", encoding="utf-8") as f:
+                    f.write(html_content)
+                logger.info(f"Saved raw HTML to {html_path}")
 
-        # Save processed data if configured
-        if self.config.get("storage", {}).get("save_processed_data", True):
-            self.storage.save_processed_data(processed_data)
+            # Parse the data
+            logger.info("Parsing scraped content")
+            universities = self.parser.parse(html_content)
 
-        # 4. Export data to database if enabled
-        if self.db_exporter:
-            try:
-                success = self.db_exporter.export(processed_data)
-                if success:
-                    logger.info("Data successfully exported to database")
-                else:
-                    logger.warning("Database export completed with warnings")
-            except Exception as e:
-                logger.error(f"Failed to export data to database: {e}")
+            # Save the parsed data
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            json_path = self.output_dir / f"rankings_{year}_{view}_{timestamp}.json"
 
-        logger.info("Pipeline completed successfully")
+            # Import json in the method to avoid circular imports
+            import json
+
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(universities, f, indent=2, ensure_ascii=False)
+
+            logger.info(
+                f"Successfully scraped and saved data for {len(universities)} universities"
+            )
+
+            # Return the results
+            return universities
+
+        except (ScraperException, ParserException) as e:
+            logger.error(f"Error during scraping/parsing: {str(e)}")
+            raise
+        except Exception as e:
+            logger.exception(f"Unexpected error in pipeline: {str(e)}")
+            raise

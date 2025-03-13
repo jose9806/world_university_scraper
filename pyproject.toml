@@ -4,6 +4,9 @@ version = "0.1.0"
 description = ""
 authors = ["jose9806"]
 readme = "README.md"
+packages = [
+    {include = "src"}
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -13,6 +16,9 @@ requests = "^2.32.3"
 pandas = "^2.2.3"
 beautifulsoup4 = "^4.13.3"
 sqlalchemy = "^2.0.38"
+selenium = "^4.29.0"
+webdriver-manager = "^4.0.2"
+lxml = "^5.3.1"
 
 
 [build-system]

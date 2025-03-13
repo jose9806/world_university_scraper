@@ -6,8 +6,8 @@ from typing import Dict, Any, Optional
 
 from requests.exceptions import RequestException
 
-from utils.http import create_session, get_random_user_agent
-from utils.exceptions import ScraperException
+from ..utils.http import create_session, get_random_user_agent
+from ..utils.exceptions import ScraperException
 
 logger = logging.getLogger(__name__)
 

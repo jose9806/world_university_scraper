@@ -1,0 +1,29 @@
+# Default configuration with Selenium support for university rankings scraper
+
+# General settings
+general:
+  output_dir: "data/raw"
+  processed_dir: "data/processed"
+  log_level: "INFO"
+
+# Scraper settings
+scraper:
+  type: "selenium"  # Can be "basic" or "selenium"
+  base_url: "https://www.timeshighereducation.com/world-university-rankings/latest/world-ranking#!/length/-1/sort_by/rank/sort_order/asc/cols/scores"
+  rankings:
+    year: "2025"
+    view: "reputation"
+  request_delay: 3
+  max_retries: 3
+  user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+# Selenium-specific settings
+selenium:
+  headless: true
+  page_load_timeout: 60
+  wait_timeout: 15
+  save_html: true
+  
+# Parser settings
+parser:
+  type: "rankings"

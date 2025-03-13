@@ -5,8 +5,8 @@ import logging
 import sys
 from pathlib import Path
 
-from core.config import load_config
-from core.pipeline import ScrapingPipeline
+from .core.config import load_config  # Note the dot before core
+from .core.pipeline import ScrapingPipeline  # Note the dot before core
 
 
 def main():
@@ -15,7 +15,7 @@ def main():
     parser.add_argument(
         "--config",
         type=str,
-        default="config/default.yml",
+        default="config/default_selenium.yml",
         help="Path to configuration file",
     )
     parser.add_argument(

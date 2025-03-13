@@ -15,7 +15,7 @@ EXPORTERS: Dict[str, Type[BaseExporter]] = {
 }
 
 
-def create_exporter(exporter_type: str, config: Dict[str, Any]) -> BaseExporter:
+def create_exporter(exporter_type: str, config: Dict[str, any]) -> BaseExporter:
     """Create appropriate exporter based on the specified type.
     
     Args:

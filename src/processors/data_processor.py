@@ -2,7 +2,7 @@
 
 import logging
 from typing import Dict, Any, List
-
+import logging
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -20,45 +20,35 @@ class DataProcessor:
         self.config = config
 
     def process(self, data: List[Dict[str, Any]]) -> pd.DataFrame:
-        """Process parsed university data.
-
-        Args:
-            data: List of dictionaries containing university data
-
-        Returns:
-            Processed DataFrame of university rankings
-        """
+        """Process parsed data."""
         logger.info("Processing university rankings data")
 
-        # Convert to DataFrame for easier processing
+        # Debug the input data
+        if not data:
+            logger.warning("Empty data received from parser")
+            # Return an empty DataFrame with the required columns
+            return pd.DataFrame(columns=[
+                    'rank', 'name', 'country', 'overall_score', 'teaching_score',
+                    'research_score', 'citations_score', 'industry_income_score',
+                    'international_outlook_score'
+                ])
+
+        logger.info(f"Processing {len(data)} university records")
+
+        # Create DataFrame
         df = pd.DataFrame(data)
 
-        # Remove duplicates if any
-        df = df.drop_duplicates()
-
-        # Handle missing values
+        # Apply processing steps
         df = self._handle_missing_values(df)
+        df = self._normalize_scores(df)
 
-        # Add additional computed columns
-        df = self._add_computed_columns(df)
-
-        # Sort by rank
-        df = df.sort_values("rank")
-
-        logger.info(f"Processed {len(df)} universities")
         return df
 
     def _handle_missing_values(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Handle missing values in the DataFrame.
+        """Handle missing values in the DataFrame."""
+        logger.info(f"DataFrame columns: {list(df.columns)}")
 
-        Args:
-            df: DataFrame containing university data
-
-        Returns:
-            DataFrame with missing values handled
-        """
-        # For score columns, fill missing values with 0 or other approach
-        # based on configuration
+        # Define the score columns we expect
         score_columns = [
             "overall_score",
             "teaching_score",
@@ -68,16 +58,14 @@ class DataProcessor:
             "international_outlook_score",
         ]
 
-        missing_strategy = self.config.get("missing_values_strategy", "zero")
+        # Only process columns that exist in the DataFrame
+        existing_score_columns = [col for col in score_columns if col in df.columns]
 
-        if missing_strategy == "zero":
-            df[score_columns] = df[score_columns].fillna(0)
-        elif missing_strategy == "mean":
-            for col in score_columns:
-                df[col] = df[col].fillna(df[col].mean())
-        elif missing_strategy == "median":
-            for col in score_columns:
-                df[col] = df[col].fillna(df[col].median())
+        if existing_score_columns:
+            logger.info(f"Filling NA values for columns: {existing_score_columns}")
+            df[existing_score_columns] = df[existing_score_columns].fillna(0)
+        else:
+            logger.warning("No score columns found in DataFrame")
 
         return df
 
