@@ -63,7 +63,7 @@ class SeleniumRankingsScraper(SeleniumBaseScraper):
                 logger.info("Waiting for rankings table to load")
 
                 # Wait for table - adjust the selector based on the actual page structure
-                table = WebDriverWait(self.driver, 15).until(
+                _ = WebDriverWait(self.driver, 15).until(
                     EC.presence_of_element_located(
                         (
                             By.CSS_SELECTOR,
@@ -78,13 +78,13 @@ class SeleniumRankingsScraper(SeleniumBaseScraper):
                 self._scroll_to_load_all_data()
 
                 # Get the final page source with all data loaded
-                html_content = self.driver.page_source
+                html_content = self.driver.page_source # type: ignore
                 return html_content
 
             except TimeoutException:
                 logger.warning("Timeout waiting for rankings table")
-                # Even if we hit timeout, return whatever HTML we have - the parser can try to handle it
-                return self.driver.page_source
+
+                return self.driver.page_source # type: ignore
 
         except Exception as e:
             logger.error(f"Error scraping rankings: {str(e)}")

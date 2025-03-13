@@ -286,10 +286,3 @@ The project implements robust error handling:
 - Detailed logging for troubleshooting
 - Graceful degradation when parts of the pipeline fail
 
-
-## Acknowledgements
-
-- [Times Higher Education](https://www.timeshighereducation.com/) for providing the university rankings data
-- [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) for HTML parsing
-- [Requests](https://docs.python-requests.org/) for HTTP requests
-- [Pandas](https://pandas.pydata.org/) for data manipulation

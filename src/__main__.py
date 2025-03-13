@@ -5,8 +5,8 @@ import logging
 import sys
 from pathlib import Path
 
-from .core.config import load_config  # Note the dot before core
-from .core.pipeline import ScrapingPipeline  # Note the dot before core
+from .core.config import load_config
+from .core.pipeline import ScrapingPipeline
 
 
 def main():

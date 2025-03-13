@@ -33,7 +33,7 @@ class ScrapingPipeline:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def _create_scraper(self) -> BaseScraper:
+    def _create_scraper(self) -> BaseScraper | SeleniumRankingsScraper:
         """Create and configure the appropriate scraper based on configuration.
 
         Returns:
