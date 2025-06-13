@@ -68,6 +68,35 @@ class DataProcessor:
             logger.warning("No score columns found in DataFrame")
 
         return df
+        
+    def _normalize_scores(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Normalize score columns in the DataFrame.
+        
+        Args:
+            df: DataFrame containing university data
+            
+        Returns:
+            DataFrame with normalized score columns
+        """
+        logger.info("Normalizing score columns")
+        
+        score_columns = [
+            "overall_score",
+            "teaching_score",
+            "research_score",
+            "citations_score",
+            "industry_income_score",
+            "international_outlook_score",
+        ]
+        
+        # Only normalize columns that exist in the DataFrame
+        existing_score_columns = [col for col in score_columns if col in df.columns]
+        
+        for col in existing_score_columns:
+            if df[col].max() > 0:  # Avoid division by zero
+                df[col] = (df[col] / df[col].max() * 100).round(1)
+                
+        return df
 
     def _add_computed_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add computed columns to the DataFrame.
