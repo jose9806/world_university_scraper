@@ -84,19 +84,20 @@ class SeleniumBaseScraper:
 
         while retry_count < max_retries:
             try:
-                logger.info(f"Navigating to {url} with Selenium")
-                self.driver.get(url)
+                if self.driver is not None:
+                    logger.info(f"Navigating to {url} with Selenium")
+                    self.driver.get(url)
 
-                # Wait for page to load completely
-                time.sleep(2)  # Initial pause to let JS start executing
+                    # Wait for page to load completely
+                    time.sleep(2)  # Initial pause to let JS start executing
 
-                # Get the page source after JavaScript has executed
-                html_content = self.driver.page_source
+                    # Get the page source after JavaScript has executed
+                    html_content = self.driver.page_source
 
-                # Respect the site's terms by adding delay between requests
-                time.sleep(self.delay)
+                    # Respect the site's terms by adding delay between requests
+                    time.sleep(self.delay)
 
-                return html_content
+                    return html_content
 
             except (WebDriverException, Exception) as e:
                 retry_count += 1

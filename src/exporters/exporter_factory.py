@@ -3,9 +3,9 @@
 import logging
 from typing import Dict, Type, Any
 
-from exporters.base_exporter import BaseExporter
-from exporters.postgres_exporter import PostgresExporter
-from utils.exceptions import ExporterException
+from .base_exporter import BaseExporter
+from .postgres_exporter import PostgresExporter
+from ..utils.exceptions import ExporterException
 
 logger = logging.getLogger(__name__)
 

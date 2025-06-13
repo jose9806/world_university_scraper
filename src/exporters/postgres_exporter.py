@@ -16,8 +16,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import SQLAlchemyError
 
-from exporters.base_exporter import BaseExporter
-from utils.exceptions import ExporterException
+from src.exporters.base_exporter import BaseExporter
+from src.utils.exceptions import ExporterException
 
 logger = logging.getLogger(__name__)
 

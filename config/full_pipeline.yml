@@ -1,0 +1,199 @@
+# Full Pipeline Configuration for World University Scraper
+
+# General settings
+general:
+  output_dir: "data/pipeline_results"
+  log_level: "INFO"
+
+# Basic scraper settings (for compatibility)
+scraper:
+  type: "selenium"
+  request_delay: 3
+  max_retries: 3
+
+# Selenium settings (for compatibility)
+selenium:
+  headless: true
+  page_load_timeout: 60
+  wait_timeout: 15
+
+# Parser settings (for compatibility)
+parser:
+  type: "rankings"
+
+# Sub-configuration files for different components
+rankings_config: "config/default_selenium.yml"
+university_config: "config/university_detail.yml"
+
+# Data processing settings
+processor:
+  # Settings for DataProcessor
+  handle_missing_values: true
+  normalize_scores: true
+  
+  # Data quality settings
+  min_score_threshold: 0
+  max_score_threshold: 100
+  
+  # Additional processing options
+  deduplicate: true
+  sort_by_rank: true
+
+# Storage settings
+storage:
+  # File storage configuration
+  save_raw: true
+  save_processed: true
+  save_combined: true
+  
+  # Compression settings
+  compress: true
+  format: "pickle"  # Options: pickle, parquet, csv
+  
+  # Backup settings
+  create_backup: true
+  backup_dir: "data/backups"
+
+# Export settings
+exporters:
+  # CSV export (always available)
+  csv:
+    enabled: true
+    output_dir: "data/exports/csv"
+    
+    # File naming
+    filename: "university_rankings_{timestamp}.csv"
+    
+    # CSV options
+    index: false
+    encoding: "utf-8"
+    sep: ","
+  
+  # JSON export (always available)
+  json:
+    enabled: true
+    output_dir: "data/exports/json"
+    
+    # File naming
+    filename: "university_data_{timestamp}.json"
+    
+    # JSON options
+    pretty_print: true
+    ensure_ascii: false
+    include_metadata: true
+  
+  # Excel export (always available)
+  excel:
+    enabled: false
+    output_dir: "data/exports/excel"
+    filename: "university_data_{timestamp}.xlsx"
+    
+    # Sheet options
+    sheet_name: "University_Data"
+    include_summary: true
+    index: false
+  
+  # PostgreSQL export (optional - requires configuration)
+  postgres:
+    enabled: false  # Set to true to enable PostgreSQL export
+    host: "localhost"
+    port: 5432
+    database: "university_rankings"
+    user: "scraper_user"
+    password: "${POSTGRES_PASSWORD}"  # Use environment variable
+    
+    # Table settings
+    table_name: "university_rankings"
+    schema: "public"
+    
+    # Export options
+    if_exists: "replace"  # Options: replace, append, fail
+    index: false
+    method: "multi"  # For faster inserts
+    chunksize: 1000
+
+# Pipeline execution settings
+pipeline:
+  # Execution options
+  continue_on_error: true
+  save_intermediate_results: true
+  
+  # Performance settings
+  university_batch_size: 50
+  max_concurrent_requests: 3
+  
+  # Retry settings
+  max_retries: 3
+  retry_delay: 5
+  
+  # Quality control
+  min_success_rate: 0.7  # Minimum 70% success rate required
+  
+  # Scheduling (for future cron integration)
+  schedule:
+    enabled: false
+    cron_expression: "0 2 * * 0"  # Weekly on Sunday at 2 AM
+    
+# Monitoring and alerting (for future implementation)
+monitoring:
+  enabled: false
+  
+  # Metrics to track
+  track_scraping_time: true
+  track_success_rates: true
+  track_data_quality: true
+  
+  # Alerting
+  email_alerts: false
+  webhook_url: ""
+  
+  # Thresholds
+  alert_on_failure_rate: 0.3  # Alert if >30% failure rate
+  alert_on_long_execution: 3600  # Alert if execution > 1 hour
+
+# Data validation settings
+validation:
+  # Required fields validation
+  required_fields:
+    rankings:
+      - "rank"
+      - "name"
+      - "country"
+    universities:
+      - "name"
+      - "url"
+  
+  # Data quality checks
+  check_duplicate_names: true
+  check_rank_sequence: true
+  check_score_ranges: true
+  
+  # Outlier detection
+  detect_outliers: true
+  outlier_threshold: 3  # Standard deviations
+  
+# Environment-specific overrides
+environments:
+  development:
+    general:
+      log_level: "DEBUG"
+    pipeline:
+      university_batch_size: 10  # Smaller batches for testing
+    exporters:
+      postgres:
+        enabled: false
+      csv:
+        enabled: true
+  
+  production:
+    general:
+      log_level: "INFO"
+    pipeline:
+      university_batch_size: 100  # Larger batches for efficiency
+    exporters:
+      postgres:
+        enabled: true
+      csv:
+        enabled: true
+    monitoring:
+      enabled: true

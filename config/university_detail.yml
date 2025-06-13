@@ -1,0 +1,35 @@
+# Configuration for university detail scraping
+
+# General settings
+general:
+  output_dir: "data/universities"
+  log_level: "INFO"
+
+# Scraper settings for university details
+scraper:
+  type: "selenium"
+  
+  # Selenium-specific settings
+  headless: true
+  page_load_timeout: 60
+  wait_timeout: 15
+  
+  # Request timing
+  request_delay: 3          # Standard delay between requests
+  university_delay: 5       # Extra delay between university pages
+  
+  # Retry settings
+  max_retries: 3
+  
+  # Browser settings
+  user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+# Selenium-specific settings
+selenium:
+  headless: true
+  page_load_timeout: 60
+  wait_timeout: 15
+
+# Parser settings
+parser:
+  type: "university_detail"
