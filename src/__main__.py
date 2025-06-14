@@ -29,7 +29,7 @@ def setup_logging(log_level: str, log_file: str = "logs/main_orchestrator.log"):
     )
 
 
-def run_rankings_scraper(config_file: str, **kwargs) -> str:
+def run_rankings_scraper(config_file: str, **kwargs):
     """Run the rankings scraper and return the output file path."""
     logger = logging.getLogger(__name__)
     logger.info("Starting rankings scraper...")
@@ -56,27 +56,55 @@ def run_rankings_scraper(config_file: str, **kwargs) -> str:
 
     # Run subprocess
     try:
+        logger.debug(f"Running command: {' '.join(cmd)}")
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        logger.info("Rankings scraper completed successfully")
+        logger.info("University detail scraper completed successfully")
+
+        # Log the output for debugging
+        if result.stdout:
+            logger.debug(f"Script output: {result.stdout}")
 
         # Parse output to find the JSON file path
         output_lines = result.stdout.split("\n")
         json_file = None
+
+        # Look for explicit output file marker first
         for line in output_lines:
-            if "rankings_" in line and ".json" in line and "saved" in line.lower():
-                # Extract file path from log message
-                parts = line.split()
-                for part in parts:
-                    if part.endswith(".json") and "rankings_" in part:
-                        json_file = part
-                        break
+            if line.startswith("UNIVERSITIES_OUTPUT_FILE:"):
+                json_file = line.replace("UNIVERSITIES_OUTPUT_FILE:", "").strip()
                 break
+
+        # Fallback to searching in log messages
+        if not json_file:
+            for line in output_lines:
+                if "universities_detail_" in line and ".json" in line:
+                    parts = line.split()
+                    for part in parts:
+                        if part.endswith(".json") and "universities_detail_" in part:
+                            json_file = part
+                            break
+                    if json_file:
+                        break
 
         return json_file
 
     except subprocess.CalledProcessError as e:
-        logger.error(f"Rankings scraper failed: {e}")
-        logger.error(f"Error output: {e.stderr}")
+        logger.error(f"University detail scraper failed with exit code {e.returncode}")
+        logger.error(f"Command: {' '.join(cmd)}")
+        if e.stdout:
+            logger.error(f"Script stdout: {e.stdout}")
+        if e.stderr:
+            logger.error(f"Script stderr: {e.stderr}")
+
+        # Try to run the script directly for better error reporting
+        logger.info("Attempting direct execution for detailed error...")
+        try:
+            direct_cmd = cmd[:]
+            direct_cmd.extend(["--limit", "1"])  # Limit to 1 for quick testing
+            result = subprocess.run(direct_cmd, capture_output=False, text=True)
+        except Exception as direct_error:
+            logger.error(f"Direct execution also failed: {direct_error}")
+
         raise
 
 

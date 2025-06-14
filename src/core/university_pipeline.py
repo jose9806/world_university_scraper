@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List
 
-from .exceptions import ScraperException, ParserException
+
 from ..scrapers.university_detail_scraper import UniversityDetailScraper
 from ..parsers.university_detail_parser import UniversityDetailParser
 

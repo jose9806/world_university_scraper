@@ -175,6 +175,7 @@ Examples:
         pipeline = UniversityDetailPipeline(config)
 
         # Determine source of URLs
+        # Determine source of URLs
         urls = []
         if args.rankings_file:
             logger.info(f"Loading URLs from rankings file: {args.rankings_file}")
@@ -185,6 +186,10 @@ Examples:
 
         if not urls:
             logger.error("No URLs found to process")
+            if args.rankings_file:
+                logger.error(
+                    f"Check that {args.rankings_file} contains valid university URLs"
+                )
             sys.exit(1)
 
         # Apply limit if specified

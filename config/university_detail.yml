@@ -1,4 +1,4 @@
-# Configuration for university detail scraping
+# Configuration for university detail scraping with improved selectors
 
 # General settings
 general:
@@ -12,16 +12,16 @@ scraper:
   # Selenium-specific settings
   headless: true
   page_load_timeout: 60
-  wait_timeout: 15
+  wait_timeout: 15       
   
-  # Request timing
+  # Request timing - adjusted for THE website
   request_delay: 3          # Standard delay between requests
-  university_delay: 5       # Extra delay between university pages
+  university_delay: 8       # Longer delay between university pages (be respectful)
   
   # Retry settings
   max_retries: 3
   
-  # Browser settings
+  # Browser settings optimized for THE website
   user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 # Selenium-specific settings
@@ -29,7 +29,21 @@ selenium:
   headless: true
   page_load_timeout: 60
   wait_timeout: 15
+  
+  # Additional browser options for stability
+  browser_options:
+    - "--no-sandbox"
+    - "--disable-dev-shm-usage" 
+    - "--disable-gpu"
+    - "--window-size=1920,1080"
+    - "--disable-blink-features=AutomationControlled"
+    - "--disable-extensions"
 
 # Parser settings
 parser:
   type: "university_detail"
+  
+  # Parsing options
+  extract_all_subjects: true
+  include_description: true
+  max_description_length: 500
