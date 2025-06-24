@@ -11,14 +11,14 @@ from .exporter_factory import create_exporter
 
 # Import PostgreSQL exporter if available
 try:
-    from .postgres_exporter import PostgresExporter
+    from .postgres_exporter import PostgreSQLExporter
 
     __all__ = [
         "BaseExporter",
         "CSVExporter",
         "JSONExporter",
         "ExcelExporter",
-        "PostgresExporter",
+        "PostgreSQLExporter",
         "create_exporter",
     ]
 except ImportError:

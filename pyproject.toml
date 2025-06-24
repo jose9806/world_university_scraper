@@ -19,6 +19,9 @@ sqlalchemy = "^2.0.38"
 selenium = "^4.29.0"
 webdriver-manager = "^4.0.2"
 lxml = "^5.3.1"
+psycopg2-binary = "^2.9.10"
+python-dotenv = "^1.1.0"
+asyncio = "^3.4.3"
 
 
 [build-system]

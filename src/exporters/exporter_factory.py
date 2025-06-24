@@ -4,13 +4,13 @@ import logging
 from typing import Dict, Type, Any
 
 from .base_exporter import BaseExporter
-from .postgres_exporter import PostgresExporter
+from .postgres_exporter import PostgreSQLExporter
 from ..utils.exceptions import ExporterException
 
 logger = logging.getLogger(__name__)
 
 EXPORTERS: Dict[str, Type[BaseExporter]] = {
-    "postgres": PostgresExporter,
+    "postgres": PostgreSQLExporter,
 }
 
 

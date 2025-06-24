@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Setup script for World University Scraper."""
 
-import os
 import sys
 from pathlib import Path
-import shutil
+
 
 
 def create_directories():

@@ -1,194 +1,324 @@
-"""PostgreSQL exporter for rankings data."""
+"""Exportador PostgreSQL para datos de universidades."""
 
 import logging
-from typing import Any, Dict, List, Optional
+import os
+from typing import Dict, List, Any, Optional
+from datetime import datetime
+import uuid
 
-import pandas as pd
-from sqlalchemy import (
-    create_engine,
-    Table,
-    MetaData,
-    Column,
-    Integer,
-    String,
-    Float,
-    inspect,
-)
-from sqlalchemy.exc import SQLAlchemyError
-
-from src.exporters.base_exporter import BaseExporter
-from src.utils.exceptions import ExporterException
+from ..storage.database_manager import PostgreSQLManager
 
 logger = logging.getLogger(__name__)
 
 
-class PostgresExporter(BaseExporter):
-    """Exports data to PostgreSQL database."""
+class PostgreSQLExporter:
+    """Exportador de datos a PostgreSQL."""
 
     def __init__(self, config: Dict[str, Any]):
-        """Initialize PostgreSQL exporter with configuration.
+        """Inicializar el exportador PostgreSQL.
 
         Args:
-            config: Exporter configuration dictionary containing database settings
+            config: Configuración del exportador
         """
-        super().__init__(config)
-        self.db_config = config.get("database", {})
-        self.engine = self._create_engine()
+        self.config = config
+        self.db_config = config.get("postgres", {})
+        self.enabled = config.get("enabled", True)
+        self.batch_size = config.get("batch_size", 1000)
+        self.if_exists = config.get("if_exists", "replace")  # replace, append, fail
 
-    def _create_engine(self):
-        """Create SQLAlchemy engine for database connection.
+        self.db_manager = None
+
+    def initialize(self) -> bool:
+        """Inicializar conexión a la base de datos.
 
         Returns:
-            SQLAlchemy engine
-
-        Raises:
-            ExporterException: If connection parameters are invalid
+            True si la inicialización es exitosa
         """
-        try:
-            connection_string = self._get_connection_string()
-            logger.debug(
-                f"Creating database engine with connection string: {self._get_sanitized_connection_string()}"
-            )
-            return create_engine(connection_string)
-        except Exception as e:
-            raise ExporterException(f"Failed to create database engine: {e}")
-
-    def _get_connection_string(self) -> str:
-        """Get database connection string from configuration.
-
-        Returns:
-            Database connection string
-
-        Raises:
-            ExporterException: If required connection parameters are missing
-        """
-        # Get connection parameters from config
-        host = self.db_config.get("host", "localhost")
-        port = self.db_config.get("port", 5432)
-        database = self.db_config.get("database")
-        user = self.db_config.get("user")
-        password = self.db_config.get("password")
-
-        # Verify required parameters
-        if not all([database, user, password]):
-            raise ExporterException(
-                "Missing required database connection parameters (database, user, password)"
-            )
-
-        # Build connection string
-        return f"postgresql://{user}:{password}@{host}:{port}/{database}"
-
-    def _get_sanitized_connection_string(self) -> str:
-        """Get sanitized connection string for logging (without password).
-
-        Returns:
-            Sanitized connection string
-        """
-        host = self.db_config.get("host", "localhost")
-        port = self.db_config.get("port", 5432)
-        database = self.db_config.get("database", "")
-        user = self.db_config.get("user", "")
-
-        return f"postgresql://{user}:******@{host}:{port}/{database}"
-
-    def export(self, data: pd.DataFrame) -> bool:
-        """Export DataFrame to PostgreSQL database.
-
-        Args:
-            data: DataFrame to export
-
-        Returns:
-            Boolean indicating success
-
-        Raises:
-            ExporterException: If export operation fails
-        """
-        table_name = self.db_config.get("table_name", "university_rankings")
-        schema = self.db_config.get("schema", "public")
-        if_exists = self.db_config.get(
-            "if_exists", "replace"
-        )  # Options: fail, replace, append
-
-        try:
-            logger.info(
-                f"Exporting {len(data)} records to PostgreSQL table {schema}.{table_name}"
-            )
-
-            # Handle table schema
-            if self.db_config.get("create_schema", True):
-                self._ensure_table_schema(data, table_name, schema)
-
-            # Export data to database
-            data.to_sql(
-                name=table_name,
-                con=self.engine,
-                schema=schema,
-                if_exists=if_exists,
-                index=False,
-                chunksize=1000,  # Process in chunks to avoid memory issues
-            )
-
-            logger.info(
-                f"Successfully exported data to PostgreSQL table {schema}.{table_name}"
-            )
+        if not self.enabled:
+            logger.info("PostgreSQL exporter está deshabilitado")
             return True
 
-        except SQLAlchemyError as e:
-            raise ExporterException(f"Database export failed: {e}")
-        except Exception as e:
-            raise ExporterException(f"Export operation failed: {e}")
+        try:
+            self.db_manager = PostgreSQLManager(self.db_config)
 
-    def _ensure_table_schema(
-        self, data: pd.DataFrame, table_name: str, schema: str
-    ) -> None:
-        """Create or verify table schema if it doesn't exist.
+            if not self.db_manager.connect():
+                logger.error("❌ No se pudo conectar a PostgreSQL")
+                return False
+
+            if not self.db_manager.create_tables():
+                logger.error("❌ No se pudieron crear las tablas")
+                return False
+
+            logger.info("✅ PostgreSQL exporter inicializado exitosamente")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Error inicializando PostgreSQL exporter: {str(e)}")
+            return False
+
+    def export_rankings_data(
+        self, data: List[Dict[str, Any]], metadata: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """Exportar datos de rankings a PostgreSQL.
 
         Args:
-            data: DataFrame containing the data to be exported
-            table_name: Name of the target table
-            schema: Database schema name
+            data: Lista de datos de rankings
+            metadata: Metadatos opcionales
 
-        Raises:
-            ExporterException: If schema creation fails
+        Returns:
+            True si la exportación es exitosa
         """
-        if not self.db_config.get("manage_schema", False):
-            # Skip schema management if disabled
-            return
+        if not self.enabled or not data:
+            return True
+
+        if not self.db_manager:
+            logger.error("❌ DB Manager no está inicializado")
+            return False
 
         try:
-            metadata = MetaData(schema=schema)
+            batch_id = metadata.get("batch_id", str(uuid.uuid4()))
 
-            # Check if table exists
-            inspector = inspect(self.engine)
-            if inspector.has_table(table_name, schema=schema):
-                logger.debug(f"Table {schema}.{table_name} already exists")
-                return
+            # Exportar datos en lotes si es necesario
+            if len(data) > self.batch_size:
+                return self._export_rankings_in_batches(data, batch_id)
+            else:
+                return self.db_manager.save_rankings_data(
+                    data, batch_id, self.if_exists
+                )
 
-            # Define table columns based on DataFrame
-            columns = []
+        except Exception as e:
+            logger.error(f"❌ Error exportando rankings: {str(e)}")
+            return False
 
-            # Add rank as primary key if present
-            if "rank" in data.columns:
-                columns.append(Column("rank", Integer, primary_key=True))
+    def export_university_details(
+        self, data: List[Dict[str, Any]], metadata: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """Exportar detalles de universidades a PostgreSQL.
 
-            # Add other columns based on data types
-            for column_name, dtype in data.dtypes.items():
-                if column_name == "rank" and "rank" in [col.name for col in columns]:
-                    continue  # Skip rank if already added as primary key
+        Args:
+            data: Lista de detalles de universidades
+            metadata: Metadatos opcionales
 
-                if dtype == "object":
-                    columns.append(Column(column_name, String(255)))  # type: ignore
-                elif dtype == "float64":
-                    columns.append(Column(column_name, Float))  # type: ignore
-                elif dtype == "int64":
-                    columns.append(Column(column_name, Integer))  # type: ignore
-                else:
-                    columns.append(Column(column_name, String(255)))  # type: ignore
+        Returns:
+            True si la exportación es exitosa
+        """
+        if not self.enabled or not data:
+            return True
 
-            # Create table
-            table = Table(table_name, metadata, *columns)
-            metadata.create_all(self.engine)
-            logger.info(f"Created table {schema}.{table_name}")
+        if not self.db_manager:
+            logger.error("❌ DB Manager no está inicializado")
+            return False
 
-        except SQLAlchemyError as e:
-            raise ExporterException(f"Failed to create table schema: {e}")
+        try:
+            batch_id = metadata.get("batch_id", str(uuid.uuid4()))
+
+            # Exportar datos en lotes si es necesario
+            if len(data) > self.batch_size:
+                return self._export_details_in_batches(data, batch_id)
+            else:
+                return self.db_manager.save_details_data(data, batch_id, self.if_exists)
+
+        except Exception as e:
+            logger.error(f"❌ Error exportando detalles: {str(e)}")
+            return False
+
+    def export_combined_data(
+        self,
+        rankings_data: List[Dict[str, Any]],
+        details_data: List[Dict[str, Any]],
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Exportar datos combinados (rankings + detalles).
+
+        Args:
+            rankings_data: Datos de rankings
+            details_data: Datos de detalles
+            metadata: Metadatos opcionales
+
+        Returns:
+            True si ambas exportaciones son exitosas
+        """
+        if not self.enabled:
+            return True
+
+        try:
+            batch_id = metadata.get("batch_id", str(uuid.uuid4()))
+
+            # Actualizar metadata con el mismo batch_id
+            combined_metadata = (metadata or {}).copy()
+            combined_metadata["batch_id"] = batch_id
+
+            rankings_success = self.export_rankings_data(
+                rankings_data, combined_metadata
+            )
+            details_success = self.export_university_details(
+                details_data, combined_metadata
+            )
+
+            if rankings_success and details_success:
+                logger.info(
+                    f"✅ Datos combinados exportados exitosamente (batch: {batch_id})"
+                )
+                return True
+            else:
+                logger.error(f"❌ Error en exportación combinada (batch: {batch_id})")
+                return False
+
+        except Exception as e:
+            logger.error(f"❌ Error exportando datos combinados: {str(e)}")
+            return False
+
+    def log_export_session(
+        self,
+        session_type: str,
+        start_time: datetime,
+        end_time: datetime,
+        records_processed: int,
+        successful_exports: int,
+        failed_exports: int,
+        error_details: Optional[Dict] = None,
+        batch_id: Optional[str] = None,
+    ) -> bool:
+        """Registrar información de la sesión de exportación.
+
+        Args:
+            session_type: Tipo de exportación
+            start_time: Tiempo de inicio
+            end_time: Tiempo de finalización
+            records_processed: Registros procesados
+            successful_exports: Exportaciones exitosas
+            failed_exports: Exportaciones fallidas
+            error_details: Detalles de errores
+            batch_id: ID del lote
+
+        Returns:
+            True si el log se guarda exitosamente
+        """
+        if not self.enabled or not self.db_manager:
+            return True
+
+        try:
+            return self.db_manager.log_scraping_session(
+                batch_id or str(uuid.uuid4()),
+                f"export_{session_type}",
+                start_time,
+                end_time,
+                records_processed,
+                successful_exports,
+                failed_exports,
+                error_details,
+                self.config,
+            )
+
+        except Exception as e:
+            logger.error(f"❌ Error registrando sesión de exportación: {str(e)}")
+            return False
+
+    def _export_rankings_in_batches(
+        self, data: List[Dict[str, Any]], batch_id: str
+    ) -> bool:
+        """Exportar rankings en lotes más pequeños.
+
+        Args:
+            data: Datos a exportar
+            batch_id: ID del lote principal
+
+        Returns:
+            True si todas las exportaciones son exitosas
+        """
+        total_batches = (len(data) + self.batch_size - 1) // self.batch_size
+        successful_batches = 0
+
+        for i in range(0, len(data), self.batch_size):
+            batch_data = data[i : i + self.batch_size]
+            sub_batch_id = f"{batch_id}_rankings_{i // self.batch_size + 1}"
+
+            if self.db_manager.save_rankings_data(
+                batch_data, sub_batch_id, "append" if i > 0 else self.if_exists
+            ):
+                successful_batches += 1
+            else:
+                logger.error(f"❌ Error en lote {i // self.batch_size + 1} de rankings")
+
+        success_rate = successful_batches / total_batches
+        logger.info(
+            f"Rankings exportados en {successful_batches}/{total_batches} lotes ({success_rate:.1%})"
+        )
+
+        return success_rate >= 0.8  # 80% success rate threshold
+
+    def _export_details_in_batches(
+        self, data: List[Dict[str, Any]], batch_id: str
+    ) -> bool:
+        """Exportar detalles en lotes más pequeños.
+
+        Args:
+            data: Datos a exportar
+            batch_id: ID del lote principal
+
+        Returns:
+            True si todas las exportaciones son exitosas
+        """
+        total_batches = (len(data) + self.batch_size - 1) // self.batch_size
+        successful_batches = 0
+
+        for i in range(0, len(data), self.batch_size):
+            batch_data = data[i : i + self.batch_size]
+            sub_batch_id = f"{batch_id}_details_{i // self.batch_size + 1}"
+
+            if self.db_manager.save_details_data(
+                batch_data, sub_batch_id, "append" if i > 0 else self.if_exists
+            ):
+                successful_batches += 1
+            else:
+                logger.error(f"❌ Error en lote {i // self.batch_size + 1} de detalles")
+
+        success_rate = successful_batches / total_batches
+        logger.info(
+            f"Detalles exportados en {successful_batches}/{total_batches} lotes ({success_rate:.1%})"
+        )
+
+        return success_rate >= 0.8  # 80% success rate threshold
+
+    def get_export_stats(self) -> Optional[Dict[str, Any]]:
+        """Obtener estadísticas de exportación.
+
+        Returns:
+            Diccionario con estadísticas o None si hay error
+        """
+        if not self.enabled or not self.db_manager:
+            return None
+
+        return self.db_manager.get_scraping_stats()
+
+    def test_connection(self) -> bool:
+        """Probar la conexión a PostgreSQL.
+
+        Returns:
+            True si la conexión funciona
+        """
+        if not self.enabled:
+            return True
+
+        if not self.db_manager:
+            return self.initialize()
+
+        return self.db_manager.test_connection()
+
+    def cleanup(self) -> None:
+        """Limpiar recursos del exportador."""
+        if self.db_manager:
+            self.db_manager.close()
+            self.db_manager = None
+
+
+def create_postgres_exporter(config: Dict[str, Any]) -> PostgreSQLExporter:
+    """Crear una instancia del exportador PostgreSQL.
+
+    Args:
+        config: Configuración del exportador
+
+    Returns:
+        Instancia de PostgreSQLExporter
+    """
+    return PostgreSQLExporter(config)

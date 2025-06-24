@@ -1,236 +1,300 @@
 #!/usr/bin/env python3
-"""Script to scrape individual university details."""
+"""
+Script para scraping de detalles universitarios.
+Compatible con el orquestador principal (__main__.py).
+"""
 
 import argparse
+import json
 import logging
 import sys
-import json
+import time
+from datetime import datetime
 from pathlib import Path
+from typing import List, Dict, Any
 
-# Add src to path
+# Agregar src al path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from src.scrapers.university_detail_scraper import UniversityDetailScraper
 from src.core.config import load_config
-from src.core.university_pipeline import UniversityDetailPipeline
 
 
-def setup_logging(log_level: str, log_file: str = "logs/university_scraper.log"):
-    """Set up logging configuration."""
-    # Create logs directory if it doesn't exist
-    log_path = Path(log_file)
-    log_path.parent.mkdir(exist_ok=True)
+def setup_logging(log_level: str = "INFO"):
+    """Configurar logging."""
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
 
-    # Configure logging
+    log_file = log_dir / "university_scraper.log"
+
+    # Configurar logging
     logging.basicConfig(
         level=getattr(logging, log_level.upper()),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.FileHandler(log_file),
-            logging.StreamHandler(sys.stdout),
-        ],
+        handlers=[logging.FileHandler(log_file), logging.StreamHandler()],
     )
 
+    return logging.getLogger(__name__)
 
-def load_urls_from_file(file_path: str) -> list[str]:
-    """Load URLs from a text file (one URL per line)."""
-    urls = []
+
+def load_rankings_data(rankings_file: str) -> List[Dict[str, Any]]:
+    """Cargar datos de rankings desde archivo JSON."""
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            for line in f:
-                url = line.strip()
-                if url and not url.startswith("#"):  # Skip empty lines and comments
-                    urls.append(url)
-        return urls
+        with open(rankings_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # El archivo puede contener los datos directamente o en una clave específica
+        if isinstance(data, list):
+            rankings_data = data
+        elif isinstance(data, dict):
+            # Buscar la clave que contiene los rankings
+            possible_keys = ["rankings", "data", "universities", "results"]
+            rankings_data = None
+
+            for key in possible_keys:
+                if key in data and isinstance(data[key], list):
+                    rankings_data = data[key]
+                    break
+
+            if rankings_data is None:
+                # Si no encuentra una clave específica, tomar el primer valor que sea lista
+                for value in data.values():
+                    if isinstance(value, list):
+                        rankings_data = value
+                        break
+                else:
+                    raise ValueError(
+                        "No se encontraron datos de rankings en formato lista"
+                    )
+        else:
+            raise ValueError("Formato de archivo de rankings no válido")
+
+        return rankings_data
+
     except Exception as e:
-        logging.error(f"Failed to load URLs from file {file_path}: {str(e)}")
-        return []
+        raise ValueError(
+            f"Error cargando archivo de rankings {rankings_file}: {str(e)}"
+        )
 
 
-def save_summary_report(universities: list, output_dir: str):
-    """Save a summary report of the scraping results."""
-    if not universities:
-        return
+def extract_university_urls(
+    rankings_data: List[Dict[str, Any]], limit: int = None
+) -> List[str]:
+    """Extraer URLs de universidades desde datos de rankings."""
+    urls = []
 
-    pipeline = UniversityDetailPipeline({})  # Dummy pipeline for stats
-    stats = pipeline.get_summary_stats(universities)
+    for item in rankings_data:
+        if isinstance(item, dict):
+            # Buscar URL en diferentes campos posibles
+            url_fields = ["university_url", "url", "link", "detail_url"]
 
-    # Create summary report
-    report = {
-        "scraping_summary": stats,
-        "sample_universities": universities[:3],  # First 3 as examples
-        "universities_with_errors": [uni for uni in universities if "error" in uni][
-            :5
-        ],  # First 5 errors
-    }
+            for field in url_fields:
+                if field in item and item[field]:
+                    url = item[field].strip()
+                    if url and url.startswith("http"):
+                        urls.append(url)
+                        break
 
-    report_file = Path(output_dir) / "scraping_summary.json"
-    with open(report_file, "w", encoding="utf-8") as f:
-        json.dump(report, f, indent=2, ensure_ascii=False)
+    # Aplicar límite si se especifica
+    if limit:
+        urls = urls[:limit]
 
-    logging.info(f"Summary report saved to {report_file}")
+    return urls
 
-    # Print summary to console
-    print("\n" + "=" * 50)
-    print("SCRAPING SUMMARY")
-    print("=" * 50)
-    print(f"Total universities processed: {stats['total']}")
-    print(f"With ranking data: {stats['with_ranking_data']}")
-    print(f"With key statistics: {stats['with_key_stats']}")
-    print(f"With subject data: {stats['with_subjects']}")
-    print(f"Unique countries: {stats['unique_countries']}")
-    print(f"Unique subjects: {stats['unique_subjects']}")
-    print("=" * 50)
+
+def save_results(data: List[Dict[str, Any]], output_dir: str) -> str:
+    """Guardar resultados en archivo JSON."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # Generar nombre de archivo con timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"universities_detail_{timestamp}.json"
+    output_file = output_path / filename
+
+    try:
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False, default=str)
+
+        return str(output_file)
+
+    except Exception as e:
+        raise IOError(f"Error guardando resultados en {output_file}: {str(e)}")
 
 
 def main():
-    """Run university detail scraping."""
-    parser = argparse.ArgumentParser(
-        description="University Detail Scraper",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Scrape from rankings file
-  python scripts/scrape_universities.py --rankings-file data/raw/rankings_2025_reputation.json
-  
-  # Scrape from URL list file
-  python scripts/scrape_universities.py --urls-file university_urls.txt
-  
-  # Scrape specific URLs with batch processing
-  python scripts/scrape_universities.py --urls-file urls.txt --batch-size 25
-  
-  # Test with limited universities
-  python scripts/scrape_universities.py --rankings-file rankings.json --limit 10
-        """,
-    )
+    """Función principal."""
+    parser = argparse.ArgumentParser(description="Scraper de detalles universitarios")
 
-    # Input source arguments (mutually exclusive)
-    source_group = parser.add_mutually_exclusive_group(required=True)
-    source_group.add_argument(
-        "--rankings-file",
-        type=str,
-        help="Path to rankings JSON file containing university URLs",
-    )
-    source_group.add_argument(
-        "--urls-file",
-        type=str,
-        help="Path to text file containing university URLs (one per line)",
-    )
-
-    # Configuration arguments
+    # Argumentos requeridos (según el orquestador)
     parser.add_argument(
-        "--config",
-        type=str,
-        default="config/university_detail.yml",
-        help="Path to configuration file",
+        "--rankings-file", required=True, help="Archivo JSON con datos de rankings"
     )
+    parser.add_argument("--config", required=True, help="Archivo de configuración YAML")
+
+    # Argumentos opcionales (según el orquestador)
     parser.add_argument(
         "--log-level",
-        type=str,
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         default="INFO",
-        help="Set the logging level",
-    )
-
-    # Processing options
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=50,
-        help="Number of universities to process per batch (0 = no batching)",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Nivel de logging",
     )
     parser.add_argument(
-        "--limit",
-        type=int,
-        help="Limit the number of universities to process (for testing)",
+        "--batch-size", type=int, default=50, help="Tamaño del lote para procesamiento"
     )
+    parser.add_argument("--limit", type=int, help="Límite de universidades a procesar")
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be scraped without actually scraping",
-    )
-    parser.add_argument(
-        "--output-dir", type=str, help="Override output directory from config"
+        "--output-dir", default="data/universities", help="Directorio de salida"
     )
 
     args = parser.parse_args()
 
-    # Set up logging
-    setup_logging(args.log_level)
-    logger = logging.getLogger(__name__)
+    # Configurar logging
+    logger = setup_logging(args.log_level)
+    logger.info("=" * 60)
+    logger.info("UNIVERSITY DETAIL SCRAPER INICIADO")
+    logger.info("=" * 60)
 
     try:
-        # Load configuration
-        config_path = Path(args.config)
-        if not config_path.exists():
-            logger.error(f"Configuration file not found: {args.config}")
-            sys.exit(1)
+        # 1. Cargar configuración
+        logger.info(f"Cargando configuración desde: {args.config}")
+        config = load_config(args.config)
+        logger.info("✅ Configuración cargada exitosamente")
 
-        config = load_config(config_path)
+        # 2. Cargar datos de rankings
+        logger.info(f"Cargando datos de rankings desde: {args.rankings_file}")
+        rankings_data = load_rankings_data(args.rankings_file)
+        logger.info(f"✅ Cargados {len(rankings_data)} registros de rankings")
 
-        # Override output directory if specified
-        if args.output_dir:
-            config.setdefault("general", {})["output_dir"] = args.output_dir
+        # 3. Extraer URLs de universidades
+        logger.info("Extrayendo URLs de universidades...")
+        university_urls = extract_university_urls(rankings_data, args.limit)
 
-        # Initialize pipeline
-        pipeline = UniversityDetailPipeline(config)
+        if not university_urls:
+            logger.error("❌ No se encontraron URLs de universidades válidas")
+            return 1
 
-        # Determine source of URLs
-        # Determine source of URLs
-        urls = []
-        if args.rankings_file:
-            logger.info(f"Loading URLs from rankings file: {args.rankings_file}")
-            urls = pipeline._extract_urls_from_rankings(args.rankings_file)
-        elif args.urls_file:
-            logger.info(f"Loading URLs from file: {args.urls_file}")
-            urls = load_urls_from_file(args.urls_file)
+        logger.info(f"✅ Encontradas {len(university_urls)} URLs de universidades")
 
-        if not urls:
-            logger.error("No URLs found to process")
-            if args.rankings_file:
-                logger.error(
-                    f"Check that {args.rankings_file} contains valid university URLs"
-                )
-            sys.exit(1)
-
-        # Apply limit if specified
         if args.limit:
-            urls = urls[: args.limit]
-            logger.info(f"Limited to first {len(urls)} universities")
+            logger.info(f"🔢 Aplicando límite: {args.limit} universidades")
 
-        logger.info(f"Found {len(urls)} universities to process")
+        # 4. Inicializar scraper
+        logger.info("Inicializando scraper de universidades...")
 
-        # Dry run - just show what would be processed
-        if args.dry_run:
-            print(f"\nDRY RUN - Would process {len(urls)} universities:")
-            for i, url in enumerate(urls[:10], 1):  # Show first 10
-                print(f"  {i}. {url}")
-            if len(urls) > 10:
-                print(f"  ... and {len(urls) - 10} more")
-            return
+        # Actualizar configuración con parámetros de línea de comandos
+        scraper_config = config.get("scraper", {})
 
-        # Run scraping
-        if args.batch_size > 0 and len(urls) > args.batch_size:
-            logger.info(f"Using batch processing with batch size: {args.batch_size}")
-            results = pipeline.run_batch(urls, args.batch_size)
-        else:
-            logger.info("Processing all URLs in a single batch")
-            results = pipeline.run(urls)
+        # Aplicar batch_size si se especifica
+        if args.batch_size:
+            scraper_config["batch_size"] = args.batch_size
 
-        # Generate summary report
-        output_dir = config.get("general", {}).get("output_dir", "data/universities")
-        save_summary_report(results, output_dir)
+        scraper = UniversityDetailScraper(scraper_config)
+        logger.info("✅ Scraper inicializado")
 
-        logger.info(
-            f"Scraping completed successfully: {len(results)} universities processed"
+        # 5. Ejecutar scraping
+        logger.info(f"🕷️ Iniciando scraping de {len(university_urls)} universidades...")
+        start_time = time.time()
+
+        try:
+            university_details = scraper.scrape_university_details(university_urls)
+            duration = time.time() - start_time
+
+        except Exception as e:
+            logger.error(f"❌ Error durante el scraping: {str(e)}")
+            return 1
+
+        # 6. Verificar resultados
+        successful_count = len(
+            [u for u in university_details if u and "error" not in u]
+        )
+        failed_count = len(university_details) - successful_count
+        success_rate = (
+            (successful_count / len(university_urls)) * 100 if university_urls else 0
         )
 
+        logger.info("=" * 60)
+        logger.info("RESULTADOS DEL SCRAPING")
+        logger.info("=" * 60)
+        logger.info(f"⏱️ Duración total: {duration:.2f} segundos")
+        logger.info(
+            f"⚡ Promedio por universidad: {duration/len(university_urls):.2f} segundos"
+        )
+        logger.info(f"✅ Exitosos: {successful_count}")
+        logger.info(f"❌ Fallidos: {failed_count}")
+        logger.info(f"📊 Tasa de éxito: {success_rate:.1f}%")
+
+        # 7. Guardar resultados
+        if university_details:
+            logger.info(f"💾 Guardando resultados en: {args.output_dir}")
+
+            try:
+                output_file = save_results(university_details, args.output_dir)
+                logger.info(f"✅ Resultados guardados en: {output_file}")
+
+                # Imprimir el archivo de salida para el orquestador
+                # IMPORTANTE: Esta línea es leída por el orquestador para encontrar el archivo
+                print(f"UNIVERSITIES_OUTPUT_FILE:{output_file}")
+
+            except Exception as e:
+                logger.error(f"❌ Error guardando resultados: {str(e)}")
+                return 1
+        else:
+            logger.warning("⚠️ No hay resultados para guardar")
+            return 1
+
+        # 8. Resumen de datos extraídos
+        if successful_count > 0:
+            logger.info("📊 RESUMEN DE DATOS EXTRAÍDOS:")
+
+            total_rankings = sum(
+                len(u.get("ranking_data", {}))
+                for u in university_details
+                if "ranking_data" in u
+            )
+            total_stats = sum(
+                len(u.get("key_stats", {}))
+                for u in university_details
+                if "key_stats" in u
+            )
+            total_subjects = sum(
+                len(u.get("subjects", []))
+                for u in university_details
+                if "subjects" in u
+            )
+
+            logger.info(f"   🏆 Total rankings extraídos: {total_rankings}")
+            logger.info(f"   📈 Total estadísticas extraídas: {total_stats}")
+            logger.info(f"   🎓 Total materias extraídas: {total_subjects}")
+
+            # Mostrar ejemplos de universidades exitosas
+            successful_unis = [u for u in university_details if u and "error" not in u][
+                :3
+            ]
+            logger.info("📝 EJEMPLOS DE UNIVERSIDADES PROCESADAS:")
+
+            for i, uni in enumerate(successful_unis, 1):
+                name = uni.get("name", "Unknown")
+                rankings_count = len(uni.get("ranking_data", {}))
+                stats_count = len(uni.get("key_stats", {}))
+                logger.info(
+                    f"   {i}. {name} - Rankings: {rankings_count}, Stats: {stats_count}"
+                )
+
+        logger.info("=" * 60)
+        logger.info("UNIVERSITY DETAIL SCRAPER COMPLETADO EXITOSAMENTE")
+        logger.info("=" * 60)
+
+        return 0
+
     except KeyboardInterrupt:
-        logger.info("Scraping interrupted by user")
-        sys.exit(1)
+        logger.info("\n⏹️ Scraping interrumpido por el usuario")
+        return 1
+
     except Exception as e:
-        logger.exception(f"Unexpected error: {str(e)}")
-        sys.exit(1)
+        logger.error(f"❌ Error inesperado: {str(e)}", exc_info=True)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

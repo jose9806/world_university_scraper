@@ -54,7 +54,7 @@ def save_rankings_summary(data: list, output_dir: str):
                 ),
             }
         },
-        "scrape_timestamp": datetime.now().isoformat(),
+        "scrape_timestamp": datetime.now(),
     }
 
     summary_file = Path(output_dir) / "rankings_summary.json"
