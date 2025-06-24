@@ -96,29 +96,7 @@ cp <provided>/university_detail.yml config/
 cp <provided>/full_pipeline.yml config/
 ```
 
-#### 2. Actualizar Archivos de Importación
-```python
-# En src/scrapers/__init__.py - AGREGAR:
-from .university_detail_scraper import UniversityDetailScraper
-
-__all__ = [
-    "BaseScraper",
-    "RankingsScraper", 
-    "SeleniumRankingsScraper",
-    "UniversityDetailScraper",  # ← NUEVO
-]
-
-# En src/parsers/__init__.py - AGREGAR:
-from .university_detail_parser import UniversityDetailParser
-
-__all__ = [
-    "BaseParser",
-    "RankingsParser",
-    "UniversityDetailParser",  # ← NUEVO
-]
-```
-
-#### 3. Configurar Variables de Entorno
+#### 2. Configurar Variables de Entorno
 ```bash
 # Copiar template y personalizar
 cp .env.template .env
