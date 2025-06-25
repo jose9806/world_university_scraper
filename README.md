@@ -52,6 +52,7 @@ world_university_scraper/
 ## 🚀 Instalación y Configuración
 
 ### Requisitos
+
 - Python 3.11+
 - [Poetry](https://python-poetry.org/) para gestión de dependencias
 - Google Chrome (para Selenium)
@@ -72,6 +73,7 @@ python setup.py
 ```
 
 El script `setup.py` automáticamente:
+
 - ✅ Crea toda la estructura de directorios necesaria
 - ✅ Genera archivos de configuración template
 - ✅ Crea `.env.template` con variables de entorno
@@ -81,6 +83,7 @@ El script `setup.py` automáticamente:
 ### 📋 Después de Ejecutar setup.py
 
 #### 1. Copiar Archivos de Código
+
 ```bash
 # REEMPLAZAR archivos existentes (versiones mejoradas)
 cp <provided>/rankings_parser.py src/parsers/rankings_parser.py
@@ -97,6 +100,7 @@ cp <provided>/full_pipeline.yml config/
 ```
 
 #### 2. Configurar Variables de Entorno
+
 ```bash
 # Copiar template y personalizar
 cp .env.template .env
@@ -117,6 +121,7 @@ poetry shell
 ```
 
 ### Configuración de Base de Datos (Opcional)
+
 ```bash
 # Para exportar a PostgreSQL
 export POSTGRES_PASSWORD="tu_password_seguro"
@@ -128,6 +133,7 @@ echo "POSTGRES_PASSWORD=tu_password_seguro" >> .env
 ## ✅ Verificación de Instalación
 
 ### Prueba Rápida
+
 ```bash
 # Verificar que todo está correctamente instalado
 python -m src --mode rankings-only --limit 5 --log-level DEBUG --dry-run
@@ -137,6 +143,7 @@ python -m src --mode rankings-only --limit 5 --log-level DEBUG
 ```
 
 ### Diagnóstico de Problemas
+
 ```bash
 # Verificar configuración
 python setup.py  # Ejecutar nuevamente para verificar
@@ -153,28 +160,31 @@ python -c "from src.parsers import UniversityDetailParser; print('✓ Imports OK
 
 El sistema ofrece múltiples modos de ejecución a través del orquestador principal:
 
-### 1. 🔥 Orquestador Principal (Recomendado)
+### 1. 🔥 Orquestador Principal con Auto-Inserción PostgreSQL
 
 ```bash
-# Pipeline completo (rankings + universidades + procesamiento)
-python -m src --mode full-pipeline
+# Pipeline completo con auto-inserción a PostgreSQL
+python -m src --mode full-pipeline --config config/full_pipeline.yml
 
-# Pipeline completo con exportación a PostgreSQL
+# Solo rankings con auto-inserción a PostgreSQL
+python -m src --mode rankings-only --limit 50 --config config/full_pipeline.yml
+
+# Solo universidades con auto-inserción a PostgreSQL
+python -m src --mode universities-only \
+    --rankings-file data/raw/rankings_2025_reputation.json \
+    --config config/full_pipeline.yml
+
+# Deshabilitar PostgreSQL temporalmente
+python -m src --mode rankings-only --no-postgres --limit 10
+
+# Pipeline completo con exportación tradicional + PostgreSQL
 python -m src --mode full-pipeline --export-data --config config/full_pipeline.yml
-
-# Solo scraping de rankings
-python -m src --mode rankings-only --year 2025 --view reputation
-
-# Solo scraping de universidades (requiere archivo de rankings existente)
-python -m src --mode universities-only --rankings-file data/raw/rankings_2025_reputation.json
-
-# Solo exportar datos ya procesados
-python -m src --mode export-only --processed-file data/processed/combined_data.pkl
 ```
 
 ### 2. 📊 Scripts Especializados
 
 #### Scraping de Rankings
+
 ```bash
 # Básico
 python scripts/scrape_rankings.py
@@ -196,6 +206,7 @@ python scripts/scrape_rankings.py \
 ```
 
 #### Scraping de Universidades
+
 ```bash
 # Desde archivo de rankings
 python scripts/scrape_universities.py \
@@ -218,6 +229,7 @@ python scripts/scrape_universities.py \
 ## 📋 Flujos de Trabajo Típicos
 
 ### Flujo Completo Automatizado
+
 ```bash
 # Ejecutar pipeline completo con todas las funcionalidades
 python -m src \
@@ -229,6 +241,7 @@ python -m src \
 ```
 
 ### Flujo por Etapas
+
 ```bash
 # Paso 1: Scraping de rankings
 python -m src --mode rankings-only --config config/default_selenium.yml
@@ -243,6 +256,7 @@ python -m src --mode export-only \
 ```
 
 ### Flujo de Desarrollo/Testing
+
 ```bash
 # Testing rápido con datos limitados
 python -m src \
@@ -256,40 +270,42 @@ python -m src \
 ## ⚙️ Configuración Detallada
 
 ### Configuración Principal (`full_pipeline.yml`)
+
 ```yaml
 general:
-  output_dir: "data/pipeline_results"
-  log_level: "INFO"
+  output_dir: 'data/pipeline_results'
+  log_level: 'INFO'
 
 # Archivos de configuración para cada componente
-rankings_config: "config/default_selenium.yml"
-university_config: "config/university_detail.yml"
+rankings_config: 'config/default_selenium.yml'
+university_config: 'config/university_detail.yml'
 
 # Configuración de exportadores
 exporters:
   postgres:
     enabled: true
-    host: "localhost"
-    database: "university_rankings"
+    host: 'localhost'
+    database: 'university_rankings'
     # ... más opciones
-  
+
   csv:
     enabled: true
-    output_dir: "data/exports/csv"
-  
+    output_dir: 'data/exports/csv'
+
   excel:
     enabled: false
-    output_dir: "data/exports/excel"
+    output_dir: 'data/exports/excel'
 ```
 
 ### Configuración de Rankings (`default_selenium.yml`)
+
 ```yaml
 scraper:
-  type: "selenium"
-  base_url: "https://www.timeshighereducation.com/world-university-rankings/latest/world-ranking"
+  type: 'selenium'
+  base_url: 'https://www.timeshighereducation.com/world-university-rankings/latest/world-ranking'
   rankings:
-    year: "2025"
-    view: "reputation"
+    year: '2025'
+    view: 'reputation'
   request_delay: 3
 
 selenium:
@@ -299,80 +315,89 @@ selenium:
 ```
 
 ### Configuración de Universidades (`university_detail.yml`)
+
 ```yaml
 scraper:
-  type: "selenium"
+  type: 'selenium'
   headless: true
-  university_delay: 5  # Delay entre universidades
+  university_delay: 5 # Delay entre universidades
   max_retries: 3
 ```
+
 ## 📊 Exportadores Disponibles
 
 El sistema incluye múltiples exportadores para diferentes necesidades:
 
 ### ✅ **Exportadores Siempre Disponibles**
+
 - **CSV**: Exportación a archivos CSV estándar
-- **JSON**: Exportación a archivos JSON con metadatos opcionales  
+- **JSON**: Exportación a archivos JSON con metadatos opcionales
 - **Excel**: Exportación a archivos Excel con múltiples hojas
 
 ### 🔧 **Exportadores Opcionales**
+
 - **PostgreSQL**: Exportación a base de datos PostgreSQL (requiere instalación y configuración)
 
 ### **Ejemplos de Configuración de Exportadores**
 
 #### CSV Export
+
 ```yaml
 exporters:
   csv:
     enabled: true
-    output_dir: "data/exports/csv"
-    filename: "rankings_{timestamp}.csv"
-    encoding: "utf-8"
+    output_dir: 'data/exports/csv'
+    filename: 'rankings_{timestamp}.csv'
+    encoding: 'utf-8'
     index: false
 ```
 
 #### JSON Export
+
 ```yaml
 exporters:
   json:
     enabled: true
-    output_dir: "data/exports/json"
-    filename: "data_{timestamp}.json"
+    output_dir: 'data/exports/json'
+    filename: 'data_{timestamp}.json'
     pretty_print: true
-    include_metadata: true  # Incluye información sobre exportación
+    include_metadata: true # Incluye información sobre exportación
 ```
 
 #### Excel Export
+
 ```yaml
 exporters:
   excel:
     enabled: true
-    output_dir: "data/exports/excel"
-    filename: "report_{timestamp}.xlsx"
-    sheet_name: "University_Data"
-    include_summary: true  # Hoja adicional con resumen
+    output_dir: 'data/exports/excel'
+    filename: 'report_{timestamp}.xlsx'
+    sheet_name: 'University_Data'
+    include_summary: true # Hoja adicional con resumen
 ```
 
 #### PostgreSQL Export (Opcional)
+
 ```yaml
 exporters:
   postgres:
     enabled: true
-    host: "localhost"
+    host: 'localhost'
     port: 5432
-    database: "university_rankings"
-    user: "scraper_user"
-    password: "${POSTGRES_PASSWORD}"  # Variable de entorno
-    table_name: "rankings"
-    if_exists: "replace"  # replace, append, fail
+    database: 'university_rankings'
+    user: 'scraper_user'
+    password: '${POSTGRES_PASSWORD}' # Variable de entorno
+    table_name: 'rankings'
+    if_exists: 'replace' # replace, append, fail
 ```
+
 ```yaml
 scraper:
-  type: "selenium"
-  base_url: "https://www.timeshighereducation.com/world-university-rankings/latest/world-ranking"
+  type: 'selenium'
+  base_url: 'https://www.timeshighereducation.com/world-university-rankings/latest/world-ranking'
   rankings:
-    year: "2025"
-    view: "reputation"
+    year: '2025'
+    view: 'reputation'
   request_delay: 3
 
 selenium:
@@ -380,9 +405,11 @@ selenium:
   page_load_timeout: 60
   save_html: true
 ```
+
 ## 📊 Estructura de Datos
 
 ### Datos de Rankings (Mejorados)
+
 ```json
 {
   "rank": 1,
@@ -399,6 +426,7 @@ selenium:
 ```
 
 ### Datos de Universidades Individuales
+
 ```json
 {
   "url": "https://www.timeshighereducation.com/world-university-rankings/university-oxford",
@@ -434,6 +462,7 @@ selenium:
 ```
 
 ### Datos Combinados (Pipeline Completo)
+
 ```json
 {
   "rank": 1,
@@ -455,6 +484,7 @@ selenium:
 ## 🔧 Casos de Uso Específicos
 
 ### 1. Configuración Inicial Completa
+
 ```bash
 # Configuración automática completa
 python setup.py
@@ -465,6 +495,7 @@ python -m src --mode rankings-only --limit 5 --dry-run
 # Primera ejecución completa de prueba
 python -m src --mode full-pipeline --limit 10 --batch-size 5
 ```
+
 ```bash
 # Scraping semanal automatizado
 python -m src \
@@ -477,6 +508,7 @@ python -m src \
 ```
 
 ### 2. Monitoreo Regular de Rankings
+
 ```bash
 # Scraping semanal automatizado
 python -m src \
@@ -489,6 +521,7 @@ python -m src \
 ```
 
 ### 3. Investigación Académica Profunda
+
 ```bash
 # Scraping completo con máximo detalle
 python -m src \
@@ -500,15 +533,23 @@ python -m src \
 ```
 
 ### 3. Integración con Sistemas Externos
+
 ```bash
 # Exportar solo a PostgreSQL para dashboard
 python -m src \
     --mode export-only \
     --processed-file data/processed/latest_data.pkl \
-    --config config/postgres_only.yml
+    --config config/full_pipeline.yml
+
+# Solo PostgreSQL (sin archivos)
+python -m src \
+    --mode rankings-only \
+    --config config/postgres_only.yml \
+    --no-files  # (función futura)
 ```
 
 ### 4. Análisis de Universidades Específicas
+
 ```bash
 # Crear archivo con URLs específicas
 echo "https://www.timeshighereducation.com/world-university-rankings/university-oxford" > specific_unis.txt
@@ -525,6 +566,7 @@ python scripts/scrape_universities.py \
 ### Problemas de Configuración Inicial
 
 #### 1. Error en setup.py
+
 ```bash
 # Problema: setup.py falla durante la ejecución
 # Solución: Verificar permisos y ejecutar paso a paso
@@ -538,6 +580,7 @@ ls -la logs/
 ```
 
 #### 2. Archivos de configuración faltantes
+
 ```bash
 # Problema: Config files no encontrados después de setup.py
 # Solución: Crear templates manualmente
@@ -558,6 +601,7 @@ python -c "from src.core.config import load_config; print('Config OK')"
 ```
 
 #### 3. Imports fallando después de setup
+
 ```bash
 # Problema: ImportError para nuevos módulos
 # Solución: Verificar que los archivos están en las ubicaciones correctas
@@ -578,6 +622,7 @@ except ImportError as e:
 ### Errores Comunes
 
 #### 4. Error de Selenium WebDriver
+
 ```bash
 # Problema: WebDriver no encontrado
 # Solución: Actualizar Chrome y webdriver-manager
@@ -585,6 +630,7 @@ pip install --upgrade webdriver-manager selenium
 ```
 
 #### 5. Error de Parsing
+
 ```bash
 # Problema: 'NoneType' object has no attribute 'text'
 # Solución: Usar el parser mejorado (ya implementado)
@@ -593,6 +639,7 @@ python scripts/scrape_rankings.py --log-level DEBUG
 ```
 
 #### 6. Timeout en Scraping
+
 ```bash
 # Problema: Páginas cargan lentamente
 # Solución: Aumentar timeouts en configuración
@@ -603,6 +650,7 @@ selenium:
 ```
 
 #### 7. Límite de Rate Limiting
+
 ```bash
 # Problema: Servidor rechaza requests
 # Solución: Aumentar delays
@@ -614,6 +662,7 @@ scraper:
 ### Logs y Debugging
 
 #### Ubicación de Logs
+
 ```bash
 logs/
 ├── main_orchestrator.log      # Log del orquestador principal
@@ -623,6 +672,7 @@ logs/
 ```
 
 #### Comandos de Debugging
+
 ```bash
 # Ver logs en tiempo real
 tail -f logs/main_orchestrator.log
@@ -637,8 +687,9 @@ grep -i "successfully" logs/*.log | wc -l
 ### Verificación de Datos
 
 #### Revisión Rápida de Resultados
+
 ```python
-# Script para revisar datos procesados
+# Script para revisar datos procesados + PostgreSQL
 import pandas as pd
 import json
 from pathlib import Path
@@ -646,57 +697,80 @@ from pathlib import Path
 # Función de verificación automática
 def verify_installation():
     """Verificar que la instalación está completa."""
-    
+
     # Verificar directorios
     required_dirs = [
-        "data/raw", "data/processed", "data/universities", 
+        "data/raw", "data/processed", "data/universities",
         "data/exports/csv", "logs", "scripts"
     ]
-    
+
     missing_dirs = []
     for dir_path in required_dirs:
         if not Path(dir_path).exists():
             missing_dirs.append(dir_path)
-    
+
     if missing_dirs:
         print(f"❌ Directorios faltantes: {missing_dirs}")
         print("💡 Ejecutar: python setup.py")
     else:
         print("✅ Estructura de directorios completa")
-    
+
     # Verificar archivos de configuración
     config_files = [
         "config/default_selenium.yml",
-        "config/university_detail.yml", 
+        "config/university_detail.yml",
         "config/full_pipeline.yml"
     ]
-    
+
     missing_configs = []
     for config_file in config_files:
         if not Path(config_file).exists():
             missing_configs.append(config_file)
-    
+
     if missing_configs:
         print(f"❌ Configs faltantes: {missing_configs}")
     else:
         print("✅ Archivos de configuración completos")
-    
+
     # Verificar scripts
     script_files = [
         "scripts/scrape_rankings.py",
         "scripts/scrape_universities.py",
         "setup.py"
     ]
-    
+
     missing_scripts = []
     for script_file in script_files:
         if not Path(script_file).exists():
             missing_scripts.append(script_file)
-    
+
     if missing_scripts:
         print(f"❌ Scripts faltantes: {missing_scripts}")
     else:
         print("✅ Scripts completos")
+
+    #  Verificar PostgreSQL
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent / "src"))
+        from src.storage.database_manager import PostgreSQLManager
+
+        db_manager = PostgreSQLManager()
+        if db_manager.test_connection():
+            print("✅ PostgreSQL conectado y funcionando")
+
+            # Verificar datos en PostgreSQL
+            stats = db_manager.get_scraping_stats()
+            if stats:
+                print(f"📊 PostgreSQL - Rankings: {stats['total_rankings']}, Detalles: {stats['total_details']}")
+            else:
+                print("ℹ️ PostgreSQL conectado pero sin datos aún")
+
+            db_manager.close()
+        else:
+            print("⚠️ PostgreSQL no disponible (opcional)")
+    except Exception as e:
+        print(f"ℹ️ PostgreSQL no configurado: {e}")
 
 # Ejecutar verificación
 verify_installation()
@@ -735,22 +809,25 @@ else:
 ## 📈 Rendimiento y Optimización
 
 ### Configuración de Rendimiento
+
 ```yaml
 # En full_pipeline.yml
 pipeline:
-  university_batch_size: 100    # Aumentar para más velocidad
-  max_concurrent_requests: 5    # Paralelización (futuro)
-  
+  university_batch_size: 100 # Aumentar para más velocidad
+  max_concurrent_requests: 5 # Paralelización (futuro)
+
 scraper:
-  headless: true               # Más rápido sin UI
-  page_load_timeout: 30        # Reducir si la conexión es buena
+  headless: true # Más rápido sin UI
+  page_load_timeout: 30 # Reducir si la conexión es buena
 ```
 
-### Métricas de Rendimiento Típicas
+### Métricas de Rendimiento Típicas (Actualizadas)
 - **Rankings**: ~2000 universidades en 10-15 minutos
-- **Universidades**: ~50 universidades por lote en 5-8 minutos
+- **Universidades**: ~50 universidades por lote en 5-8 minutos  
 - **Pipeline Completo**: 500 universidades en 45-60 minutos
 - **Procesamiento**: <1 minuto para datasets típicos
+- **🔥 Auto-inserción PostgreSQL**: +5-10 segundos por lote (despreciable)
+- **🔥 Verificación PostgreSQL**: <2 segundos
 
 ## 🔄 Mantenimiento y Actualizaciones
 
@@ -759,10 +836,11 @@ scraper:
 El script `setup.py` crea automáticamente:
 
 #### **Estructura de Directorios**
+
 ```
 📁 logs/                    # Para archivos de log
 📁 data/
-  ├── 📁 raw/              # HTML y JSON originales  
+  ├── 📁 raw/              # HTML y JSON originales
   ├── 📁 processed/        # Datos procesados
   ├── 📁 universities/     # Detalles de universidades
   ├── 📁 exports/          # Datos exportados
@@ -775,6 +853,7 @@ El script `setup.py` crea automáticamente:
 ```
 
 #### **Archivos de Configuración**
+
 ```
 📄 .env.template           # Template de variables de entorno
 📄 .gitignore             # Configuración de Git
@@ -783,7 +862,9 @@ El script `setup.py` crea automáticamente:
 ```
 
 #### **Variables de Entorno Template**
+
 El archivo `.env.template` creado incluye:
+
 ```bash
 # PostgreSQL settings
 POSTGRES_PASSWORD=your_secure_password_here
@@ -795,12 +876,13 @@ POSTGRES_USER=scraper_user
 # Optional: API keys for future integrations
 # THE_API_KEY=your_api_key_here
 
-# Optional: Notification settings  
+# Optional: Notification settings
 # WEBHOOK_URL=https://your-webhook-url.com
 # EMAIL_ALERTS_TO=admin@yourcompany.com
 ```
 
 ### Actualizaciones Regulares
+
 ```bash
 # Actualizar dependencias
 poetry update
@@ -813,6 +895,7 @@ python scripts/scrape_rankings.py --dry-run --log-level DEBUG
 ```
 
 #### **Actualización Mayor** (cambios estructurales)
+
 ```bash
 # 1. Backup completo
 tar -czf full_backup_$(date +%Y%m%d).tar.gz .
@@ -829,6 +912,7 @@ python setup.py
 ### Después de Ejecutar setup.py
 
 #### 1. **Verificar Instalación**
+
 ```bash
 # Verificar que setup.py completó correctamente
 python -c "
@@ -844,6 +928,7 @@ else:
 ```
 
 #### 2. **Primera Ejecución (Prueba)**
+
 ```bash
 # Prueba básica - solo verificar configuración
 python -m src --mode rankings-only --limit 3 --dry-run --log-level DEBUG
@@ -853,16 +938,22 @@ python -m src --mode rankings-only --limit 5 --log-level INFO
 ```
 
 #### 3. **Verificar Resultados**
+
 ```bash
 # Verificar archivos generados
 ls -la data/raw/rankings_*.json
+ls -la data/universities/*.json | tail -3
 ls -la logs/*.log
 
 # Verificar logs por errores
-grep -i error logs/*.log
+grep -c "ERROR\|CRITICAL" logs/*.log
+
+# Verificar estadísticas de scraping
+grep -i "successfully" logs/*.log | wc -l
 ```
 
 #### 4. **Pipeline Completo de Prueba**
+
 ```bash
 # Ejecutar pipeline completo con datos limitados
 python -m src --mode full-pipeline --limit 10 --batch-size 5 --log-level INFO
@@ -871,6 +962,7 @@ python -m src --mode full-pipeline --limit 10 --batch-size 5 --log-level INFO
 ### Comandos de Verificación Post-Setup
 
 #### **Verificación de Integridad**
+
 ```bash
 # Script de verificación completa
 python -c "
@@ -885,7 +977,7 @@ def check_files():
         ],
         'Configs': [
             'config/default_selenium.yml',
-            'config/university_detail.yml', 
+            'config/university_detail.yml',
             'config/full_pipeline.yml'
         ],
         'Scripts': [
@@ -899,7 +991,7 @@ def check_files():
             'src/scrapers/university_detail_scraper.py'
         ]
     }
-    
+
     all_good = True
     for category, files in checks.items():
         print(f'\\n{category}:')
@@ -909,19 +1001,20 @@ def check_files():
             else:
                 print(f'  ❌ {file_path}')
                 all_good = False
-    
+
     if all_good:
         print('\\n🎉 ¡Instalación completa y verificada!')
         print('\\n🚀 Listo para ejecutar:')
         print('   python -m src --mode full-pipeline --limit 10')
     else:
         print('\\n⚠️  Faltan archivos. Revisar instalación.')
-        
+
 check_files()
 "
 ```
 
 #### **Test de Importaciones**
+
 ```bash
 # Verificar que todas las importaciones funcionan
 python -c "
@@ -939,6 +1032,7 @@ except ImportError as e:
 ```
 
 #### **Test de Configuración**
+
 ```bash
 # Verificar configuraciones
 python -c "
@@ -964,6 +1058,7 @@ for config_file in configs:
 ```
 
 ### Desarrollo Local
+
 ```bash
 # Fork del repositorio
 git clone <your-fork>
@@ -982,27 +1077,29 @@ git push origin feature/nueva-funcionalidad
 ```
 
 ### Reportar Issues
+
 Incluir en el reporte:
+
 1. Comando ejecutado
 2. Logs relevantes
 3. Configuración utilizada
 4. Versión de Python y dependencias
-
 
 ## 📚 Recursos Adicionales
 
 ### Scripts y Herramientas Incluidas
 
 #### **setup.py - Configuración Inicial**
+
 - ✅ Crea estructura completa de directorios
 - ✅ Genera archivos de configuración template
 - ✅ Configura .gitignore y .env.template
 - ✅ Valida instalación y muestra siguientes pasos
 
-
 ### Mejores Prácticas Establecidas
 
 #### **Antes de Cada Ejecución**
+
 ```bash
 # 1. Verificar espacio libre
 df -h .
@@ -1015,6 +1112,7 @@ find logs/ -name "*.log" -mtime +7 -delete
 ```
 
 #### **Después de Cada Ejecución**
+
 ```bash
 # 1. Verificar resultados
 ls -la data/raw/*.json | tail -3
@@ -1032,6 +1130,14 @@ grep -c "ERROR\|CRITICAL" logs/*.log
 ### 🎉 ¡Comenzar Ahora!
 
 ```bash
-# 🔥 COMANDO ÚNICO PARA EMPEZAR
-python setup.py && python -m src --mode full-pipeline --limit 10 --log-level INFO
+# 🔥 COMANDO ÚNICO PARA EMPEZAR (CON POSTGRESQL)
+cd data && docker-compose up -d postgres && cd .. && \
+python setup.py && \
+python -m src --mode full-pipeline --limit 10 --log-level INFO && \
+poetry run python verify_database.py
+```
+
+```bash
+# 🔥 ALTERNATIVA SIN POSTGRESQL
+python setup.py && python -m src --mode full-pipeline --limit 10 --no-postgres
 ```

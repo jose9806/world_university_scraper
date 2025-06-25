@@ -28,6 +28,9 @@ class ScrapingPipeline:
         self.scraper = self._create_scraper()
         self.parser = self._create_parser()
 
+        # 🔥 OBTENER LÍMITE DE CONFIGURACIÓN
+        self.limit = config.get("scraper", {}).get("limit")
+
         # Create output directories
         output_dir = self.config.get("general", {}).get("output_dir", "data/raw")
         self.output_dir = Path(output_dir)
@@ -78,6 +81,8 @@ class ScrapingPipeline:
             view = rankings_config.get("view", "reputation")
 
             logger.info(f"Starting scraping for year {year}, view {view}")
+            if self.limit:
+                logger.info(f"🎯 Limiting to {self.limit} universities")
 
             # For Selenium scraper, use the specific scrape_rankings method
             if isinstance(self.scraper, SeleniumRankingsScraper):
@@ -101,6 +106,11 @@ class ScrapingPipeline:
             logger.info("Parsing scraped content")
             universities = self.parser.parse(html_content)
 
+            # 🔥 APLICAR LÍMITE SI ESTÁ CONFIGURADO
+            if self.limit and len(universities) > self.limit:
+                universities = universities[: self.limit]
+                logger.info(f"🎯 Limited results to {len(universities)} universities")
+
             # Save the parsed data
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             json_path = self.output_dir / f"rankings_{year}_{view}_{timestamp}.json"
@@ -115,12 +125,19 @@ class ScrapingPipeline:
                 f"Successfully scraped and saved data for {len(universities)} universities"
             )
 
-            # Return the results
-            return universities
+            # 🔥 DEVOLVER DICCIONARIO CON DATOS Y RUTA DEL ARCHIVO
+            return {
+                "success": True,
+                "data": universities,
+                "output_file": str(json_path),
+                "total_universities": len(universities),
+                "year": year,
+                "view": view,
+            }
 
         except (ScraperException, ParserException) as e:
             logger.error(f"Error during scraping/parsing: {str(e)}")
-            raise
+            return {"success": False, "error": str(e), "output_file": None}
         except Exception as e:
             logger.exception(f"Unexpected error in pipeline: {str(e)}")
-            raise
+            return {"success": False, "error": str(e), "output_file": None}

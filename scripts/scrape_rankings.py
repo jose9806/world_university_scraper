@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Script to scrape THE World University Rankings."""
 
 import argparse
@@ -37,43 +36,91 @@ def save_rankings_summary(data: list, output_dir: str):
     if not data:
         return
 
-    summary = {
-        "total_universities": len(data),
-        "countries": len(
-            set(uni.get("country", "") for uni in data if uni.get("country"))
-        ),
-        "with_urls": len([uni for uni in data if uni.get("university_url")]),
-        "top_10": data[:10] if len(data) >= 10 else data,
-        "score_ranges": {
-            "overall_score": {
-                "min": min(
-                    (uni.get("overall_score", 0) or 0 for uni in data), default=0
-                ),
-                "max": max(
-                    (uni.get("overall_score", 0) or 0 for uni in data), default=0
-                ),
-            }
-        },
-        "scrape_timestamp": datetime.now(),
-    }
+    # 🔥 ARREGLAR: Verificar que data es una lista
+    if isinstance(data, dict):
+        # Si data es un diccionario (como el resultado del pipeline), extraer la lista real
+        if "data" in data:
+            actual_data = data["data"]
+        elif isinstance(data, dict) and all(isinstance(v, dict) for v in data.values()):
+            # Si es un diccionario de universidades, convertir a lista
+            actual_data = list(data.values())
+        else:
+            # Si es un solo elemento, convertir a lista
+            actual_data = [data]
+    else:
+        actual_data = data
 
-    summary_file = Path(output_dir) / "rankings_summary.json"
-    with open(summary_file, "w", encoding="utf-8") as f:
-        json.dump(summary, f, indent=2, ensure_ascii=False)
+    # 🔥 VERIFICAR QUE CADA ELEMENTO ES UN DICCIONARIO
+    universities_data = []
+    for item in actual_data:
+        if isinstance(item, dict):
+            universities_data.append(item)
+        elif isinstance(item, str):
+            # Si es un string, ignorar (posiblemente un mensaje de error)
+            print(f"Ignorando elemento string en datos: {item[:100]}...")
+            continue
+        else:
+            print(f"Ignorando elemento de tipo {type(item)}: {str(item)[:100]}...")
+            continue
 
-    logging.info(f"Rankings summary saved to {summary_file}")
+    if not universities_data:
+        print("⚠️ No hay datos válidos de universidades para generar resumen")
+        return
 
-    # Print summary to console
-    print("\n" + "=" * 50)
-    print("RANKINGS SCRAPING SUMMARY")
-    print("=" * 50)
-    print(f"Total universities: {summary['total_universities']}")
-    print(f"Countries represented: {summary['countries']}")
-    print(f"Universities with detail URLs: {summary['with_urls']}")
-    print(
-        f"Success rate: {(summary['with_urls']/summary['total_universities']*100):.1f}%"
-    )
-    print("=" * 50)
+    try:
+        summary = {
+            "total_universities": len(universities_data),
+            "countries": len(
+                set(
+                    uni.get("country", "")
+                    for uni in universities_data
+                    if uni.get("country")
+                )
+            ),
+            "with_urls": len(
+                [uni for uni in universities_data if uni.get("university_url")]
+            ),
+            "top_10": (
+                universities_data[:10]
+                if len(universities_data) >= 10
+                else universities_data
+            ),
+            "score_ranges": {
+                "overall_score": {
+                    "min": min(
+                        (uni.get("overall_score", 0) or 0 for uni in universities_data),
+                        default=0,
+                    ),
+                    "max": max(
+                        (uni.get("overall_score", 0) or 0 for uni in universities_data),
+                        default=0,
+                    ),
+                }
+            },
+            "scrape_timestamp": datetime.now(),
+        }
+
+        summary_file = Path(output_dir) / "rankings_summary.json"
+        with open(summary_file, "w", encoding="utf-8") as f:
+            json.dump(summary, f, indent=2, ensure_ascii=False, default=str)
+
+        logging.info(f"Rankings summary saved to {summary_file}")
+
+        # Print summary to console
+        print("\n" + "=" * 50)
+        print("RANKINGS SCRAPING SUMMARY")
+        print("=" * 50)
+        print(f"Total universities: {summary['total_universities']}")
+        print(f"Countries represented: {summary['countries']}")
+        print(f"Universities with detail URLs: {summary['with_urls']}")
+        if summary["total_universities"] > 0:
+            success_rate = summary["with_urls"] / summary["total_universities"] * 100
+            print(f"Success rate: {success_rate:.1f}%")
+        print("=" * 50)
+
+    except Exception as e:
+        print(f"⚠️ Error generando resumen (no crítico): {e}")
+        logging.warning(f"Error en save_rankings_summary: {e}")
 
 
 def main():
@@ -95,6 +142,11 @@ Examples:
   # Debug mode with detailed logging
   python scripts/scrape_rankings.py --log-level DEBUG --save-html
         """,
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        help="Limit number of universities to scrape (for testing)",
     )
 
     # Configuration arguments
@@ -177,6 +229,11 @@ Examples:
         if args.save_html:
             config.setdefault("selenium", {})["save_html"] = True
 
+        # 🔥 CONFIGURAR LÍMITE EN EL PIPELINE
+        if args.limit:
+            config.setdefault("scraper", {})["limit"] = args.limit
+            logger.info(f"🎯 Limitando scraping a {args.limit} universidades")
+
         # Show configuration in dry run mode
         if args.dry_run:
             print("Configuration:")
@@ -203,10 +260,35 @@ Examples:
 
         logger.info(f"Successfully scraped {len(universities)} universities")
 
-        # Save JSON (unless disabled)
+        # 🔥 GUARDAR JSON Y DEVOLVER RUTA DEL ARCHIVO
+        output_dir = config.get("general", {}).get("output_dir", "data/raw")
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        # Crear nombre de archivo con timestamp
+        rankings_config = config.get("scraper", {}).get("rankings", {})
+        year = rankings_config.get("year", "2025")
+        view = rankings_config.get("view", "reputation")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        json_filename = f"rankings_{year}_{view}_{timestamp}.json"
+        json_file_path = output_path / json_filename
+
+        # Guardar archivo JSON
         if not args.no_json:
-            output_dir = config.get("general", {}).get("output_dir", "data/raw")
-            save_rankings_summary(universities, output_dir)
+            with open(json_file_path, "w", encoding="utf-8") as f:
+                json.dump(universities, f, indent=2, ensure_ascii=False)
+
+            logger.info(f"Rankings JSON saved to: {json_file_path}")
+
+            # 🔥 IMPRIMIR LA RUTA PARA QUE EL ORQUESTADOR LA CAPTURE
+            print(f"JSON_FILE_PATH: {json_file_path}")
+
+            # Save summary
+            if isinstance(universities, dict) and "data" in universities:
+                save_rankings_summary(universities["data"], output_dir)
+            else:
+                save_rankings_summary(universities, output_dir)
 
         # Process data if requested
         if args.process_data:
@@ -223,6 +305,11 @@ Examples:
                 logger.info(f"Processed data saved to: {processed_file}")
 
         logger.info("Rankings scraping completed successfully")
+
+        # 🔥 ASEGURAR QUE EL ORQUESTADOR RECIBA LA RUTA
+        if not args.no_json and json_file_path.exists():
+            # Print final path for orchestrator to capture
+            print(f"FINAL_OUTPUT: {json_file_path}")
 
     except KeyboardInterrupt:
         logger.info("Scraping interrupted by user")

@@ -2,12 +2,12 @@
 
 # General settings
 general:
-  output_dir: "data/pipeline_results"
-  log_level: "INFO"
+  output_dir: 'data/pipeline_results'
+  log_level: 'INFO'
 
 # Basic scraper settings (for compatibility)
 scraper:
-  type: "selenium"
+  type: 'selenium'
   request_delay: 3
   max_retries: 3
 
@@ -19,181 +19,137 @@ selenium:
 
 # Parser settings (for compatibility)
 parser:
-  type: "rankings"
+  type: 'rankings'
 
 # Sub-configuration files for different components
-rankings_config: "config/default_selenium.yml"
-university_config: "config/university_detail.yml"
+rankings_config: 'config/default_selenium.yml'
+university_config: 'config/university_detail.yml'
+
+# 🔥 CONFIGURACIÓN DE POSTGRESQL (CORREGIDA)
+postgres:
+  enabled: true
+  auto_insert: true
+  host: 'localhost'
+  port: 5432
+  database: 'scrap_db'
+  user: 'postgres'
+  password: 'postgres'
+  if_exists: 'append' # append, replace, fail
 
 # Data processing settings
 processor:
-  # Settings for DataProcessor
   handle_missing_values: true
   normalize_scores: true
-  
-  # Data quality settings
   min_score_threshold: 0
   max_score_threshold: 100
-  
-  # Additional processing options
   deduplicate: true
   sort_by_rank: true
 
 # Storage settings
 storage:
-  # File storage configuration
   save_raw: true
   save_processed: true
   save_combined: true
-  
-  # Compression settings
   compress: true
-  format: "pickle"  # Options: pickle, parquet, csv
-  
-  # Backup settings
+  format: 'pickle'
   create_backup: true
-  backup_dir: "data/backups"
+  backup_dir: 'data/backups'
 
 # Export settings
 exporters:
-  # CSV export (always available)
+  # CSV export
   csv:
     enabled: true
-    output_dir: "data/exports/csv"
-    
-    # File naming
-    filename: "university_rankings_{timestamp}.csv"
-    
-    # CSV options
+    output_dir: 'data/exports/csv'
+    filename: 'university_rankings_{timestamp}.csv'
     index: false
-    encoding: "utf-8"
-    sep: ","
-  
-  # JSON export (always available)
+    encoding: 'utf-8'
+    sep: ','
+
+  # JSON export
   json:
     enabled: true
-    output_dir: "data/exports/json"
-    
-    # File naming
-    filename: "university_data_{timestamp}.json"
-    
-    # JSON options
+    output_dir: 'data/exports/json'
+    filename: 'university_data_{timestamp}.json'
     pretty_print: true
     ensure_ascii: false
     include_metadata: true
-  
-  # Excel export (always available)
+
+  # Excel export
   excel:
     enabled: false
-    output_dir: "data/exports/excel"
-    filename: "university_data_{timestamp}.xlsx"
-    
-    # Sheet options
-    sheet_name: "University_Data"
+    output_dir: 'data/exports/excel'
+    filename: 'university_data_{timestamp}.xlsx'
+    sheet_name: 'University_Data'
     include_summary: true
     index: false
-  
-  # PostgreSQL export (optional - requires configuration)
+
+  # 🔥 POSTGRESQL EXPORT (CONFIGURACIÓN CORREGIDA)
   postgres:
-    enabled: false  # Set to true to enable PostgreSQL export
-    host: "localhost"
+    enabled: true
+    auto_insert: true
+    host: 'localhost'
     port: 5432
-    database: "university_rankings"
-    user: "scraper_user"
-    password: "${POSTGRES_PASSWORD}"  # Use environment variable
-    
+    database: 'scrap_db' # ✅ CORREGIDO
+    user: 'postgres' # ✅ CORREGIDO
+    password: 'postgres' # ✅ CORREGIDO (o usar variable de entorno)
+
     # Table settings
-    table_name: "university_rankings"
-    schema: "public"
-    
+    table_name: 'university_rankings'
+    schema: 'public'
+
     # Export options
-    if_exists: "replace"  # Options: replace, append, fail
+    if_exists: 'append' # Options: replace, append, fail
     index: false
-    method: "multi"  # For faster inserts
+    method: 'multi'
     chunksize: 1000
 
 # Pipeline execution settings
 pipeline:
-  # Execution options
   continue_on_error: true
   save_intermediate_results: true
-  
-  # Performance settings
   university_batch_size: 50
   max_concurrent_requests: 3
-  
-  # Retry settings
   max_retries: 3
   retry_delay: 5
-  
-  # Quality control
-  min_success_rate: 0.7  # Minimum 70% success rate required
-  
-  # Scheduling (for future cron integration)
-  schedule:
-    enabled: false
-    cron_expression: "0 2 * * 0"  # Weekly on Sunday at 2 AM
-    
-# Monitoring and alerting (for future implementation)
-monitoring:
-  enabled: false
-  
-  # Metrics to track
-  track_scraping_time: true
-  track_success_rates: true
-  track_data_quality: true
-  
-  # Alerting
-  email_alerts: false
-  webhook_url: ""
-  
-  # Thresholds
-  alert_on_failure_rate: 0.3  # Alert if >30% failure rate
-  alert_on_long_execution: 3600  # Alert if execution > 1 hour
+  min_success_rate: 0.7
 
-# Data validation settings
+# Validation settings
 validation:
-  # Required fields validation
   required_fields:
     rankings:
-      - "rank"
-      - "name"
-      - "country"
+      - 'rank'
+      - 'name'
+      - 'country'
     universities:
-      - "name"
-      - "url"
-  
-  # Data quality checks
+      - 'name'
+      - 'url'
   check_duplicate_names: true
   check_rank_sequence: true
   check_score_ranges: true
-  
-  # Outlier detection
   detect_outliers: true
-  outlier_threshold: 3  # Standard deviations
-  
+  outlier_threshold: 3
+
 # Environment-specific overrides
 environments:
   development:
     general:
-      log_level: "DEBUG"
+      log_level: 'DEBUG'
     pipeline:
-      university_batch_size: 10  # Smaller batches for testing
+      university_batch_size: 10
     exporters:
       postgres:
-        enabled: false
+        enabled: true # ✅ Habilitado para desarrollo
       csv:
         enabled: true
-  
+
   production:
     general:
-      log_level: "INFO"
+      log_level: 'INFO'
     pipeline:
-      university_batch_size: 100  # Larger batches for efficiency
+      university_batch_size: 100
     exporters:
       postgres:
         enabled: true
       csv:
         enabled: true
-    monitoring:
-      enabled: true
